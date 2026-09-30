@@ -59,8 +59,13 @@ function initTabs() {
             if (tabId === 'tab-open') loadOpenShifts();
             if (tabId === 'tab-my') loadMySchedule();
             if (tabId === 'tab-all') loadAllShifts();
+            if (tabId === 'tab-admin') loadCreateShiftOptions();
         });
     });
+
+    // Form listeners
+    document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
+    document.getElementById('busyScheduleForm')?.addEventListener('submit', handleCreateBusySchedule);
 }
 
 // ============================================================
@@ -141,10 +146,13 @@ async function loadMySchedule() {
                 <div class="empty-state__icon">👤</div>
                 <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
             </div>`;
+        document.getElementById('myBusySchedules').innerHTML = '';
         return;
     }
 
     try {
+        loadMyBusySchedules(); // Tải lịch bận
+        
         const shifts = await apiFetch(`${API_BASE}/shifts/employee/${currentEmployeeId}`);
 
         if (shifts.length === 0) {
@@ -210,6 +218,156 @@ async function checkAIHealth() {
     } catch {
         dot.classList.remove('healthy');
         text.textContent = 'AI: Offline';
+    }
+}
+
+// ============================================================
+// ADMIN: TẠO CA MỚI
+// ============================================================
+
+/** Tải dữ liệu cho form tạo ca */
+async function loadCreateShiftOptions() {
+    try {
+        const [branches, skills] = await Promise.all([
+            apiFetch(`${API_BASE}/shifts/branches`),
+            apiFetch(`${API_BASE}/shifts/skills`)
+        ]);
+
+        const branchSelect = document.getElementById('shiftBranch');
+        branchSelect.innerHTML = '<option value="">-- Chọn chi nhánh --</option>' + 
+            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+        const skillSelect = document.getElementById('shiftSkill');
+        skillSelect.innerHTML = '<option value="">-- Không yêu cầu --</option>' + 
+            skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+        const empSelect = document.getElementById('shiftEmployee');
+        empSelect.innerHTML = '<option value="">-- Để trống (Trạng thái OPEN) --</option>' + 
+            employees.map(e => `<option value="${e.id}">${e.fullName}</option>`).join('');
+            
+    } catch (err) {
+        showToast('Lỗi tải dữ liệu form tạo ca: ' + err.message, 'error');
+    }
+}
+
+/** Xử lý submit form tạo ca */
+async function handleCreateShift(e) {
+    e.preventDefault();
+    
+    const request = {
+        title: document.getElementById('shiftTitle').value,
+        startTime: document.getElementById('shiftStartTime').value,
+        endTime: document.getElementById('shiftEndTime').value,
+        branchId: parseInt(document.getElementById('shiftBranch').value),
+        requiredSkillId: document.getElementById('shiftSkill').value ? parseInt(document.getElementById('shiftSkill').value) : null,
+        requiredLevel: parseInt(document.getElementById('shiftLevel').value),
+        assignedToId: document.getElementById('shiftEmployee').value ? parseInt(document.getElementById('shiftEmployee').value) : null
+    };
+
+    try {
+        const result = await apiFetch(`${API_BASE}/shifts`, {
+            method: 'POST',
+            body: JSON.stringify(request)
+        });
+        
+        showToast('✅ ' + result.message, 'success');
+        e.target.reset(); // Reset form
+        
+        // Chuyển về tab Tất cả ca
+        document.getElementById('tabBtnAll').click();
+        refreshAll();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// EMPLOYEE: LỊCH BẬN (BUSY SCHEDULE)
+// ============================================================
+
+/** Tải danh sách lịch bận của tôi */
+async function loadMyBusySchedules() {
+    const container = document.getElementById('myBusySchedules');
+    if (!currentEmployeeId) return;
+
+    try {
+        const schedules = await apiFetch(`${API_BASE}/busy-schedules/employee/${currentEmployeeId}`);
+        
+        if (schedules.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; background: var(--bg-glass); border-radius: 8px;">Bạn chưa đăng ký lịch bận nào sắp tới.</div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>Thời gian bận</th>
+                        <th>Lý do</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${schedules.map(s => `
+                        <tr>
+                            <td>${formatTimeRange(s.startTime, s.endTime)}</td>
+                            <td>${s.reason || '—'}</td>
+                            <td>
+                                <button class="btn btn--outline btn--sm" style="color: var(--accent-red); border-color: var(--accent-red);" onclick="deleteBusySchedule(${s.id})">
+                                    Xóa
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+    } catch (err) {
+        showToast('Lỗi tải lịch bận: ' + err.message, 'error');
+    }
+}
+
+/** Đăng ký lịch bận mới */
+async function handleCreateBusySchedule(e) {
+    e.preventDefault();
+    if (!currentEmployeeId) {
+        showToast('Vui lòng chọn nhân viên trước', 'error');
+        return;
+    }
+    
+    const request = {
+        employeeId: currentEmployeeId,
+        startTime: document.getElementById('busyStartTime').value,
+        endTime: document.getElementById('busyEndTime').value,
+        reason: document.getElementById('busyReason').value
+    };
+
+    try {
+        const result = await apiFetch(`${API_BASE}/busy-schedules`, {
+            method: 'POST',
+            body: JSON.stringify(request)
+        });
+        
+        showToast('✅ ' + result.message, 'success');
+        e.target.reset(); // Reset form
+        loadMyBusySchedules(); // Refresh danh sách
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+}
+
+/** Xóa lịch bận */
+async function deleteBusySchedule(busyId) {
+    if (!confirm('Bạn có chắc muốn xóa lịch bận này?')) return;
+    
+    try {
+        const result = await apiFetch(`${API_BASE}/busy-schedules/${busyId}?employeeId=${currentEmployeeId}`, {
+            method: 'DELETE'
+        });
+        
+        showToast('✅ ' + result.message, 'success');
+        loadMyBusySchedules(); // Refresh danh sách
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
     }
 }
 

@@ -1,0 +1,25 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java / Maven
+backend/target/
+*.class
+*.jar
+*.war
+
+# Python
+__pycache__/
+*.pyc
+ai-service/venv/
+ai-service/env/
+.env
+
+# Frontend / Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db

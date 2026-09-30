@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  *   - takeShift(): Nhân viên nhận ca OPEN (OPEN → TAKEN) + Optimistic Locking
  *
  * Module 2 (AI Matchmaking):
- *   - getMatchingCandidates(): Lọc + Gọi AI chấm điểm
+ *   - getMatchingCandidates(): Lọc + Gọi AI chấm điểm + Loại nhân viên bận
  *
  * Module 3 (Auto-assign Job):
  *   - autoAssignOpenShifts(): Cron Job quét ca OPEN sắp tới, tự gán FORCE_ASSIGNED
@@ -38,7 +38,65 @@ public class ShiftService {
 
     private final ShiftRepository shiftRepository;
     private final EmployeeRepository employeeRepository;
+    private final BranchRepository branchRepository;
+    private final SkillRepository skillRepository;
+    private final BusyScheduleRepository busyScheduleRepository;
     private final AIService aiService;
+
+    // ============================================================
+    // TẠO CA MỚI
+    // ============================================================
+
+    /**
+     * Tạo ca làm việc mới.
+     *
+     * @param request Thông tin ca cần tạo
+     * @return ShiftDTO sau khi tạo
+     */
+    @Transactional
+    public ShiftDTO createShift(CreateShiftRequest request) {
+        log.info("[SHIFT] Tạo ca mới: {}", request.getTitle());
+
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chi nhánh #" + request.getBranchId()));
+
+        Skill skill = null;
+        if (request.getRequiredSkillId() != null) {
+            skill = skillRepository.findById(request.getRequiredSkillId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy kỹ năng #" + request.getRequiredSkillId()));
+        }
+
+        LocalDateTime startTime = LocalDateTime.parse(request.getStartTime());
+        LocalDateTime endTime = LocalDateTime.parse(request.getEndTime());
+
+        if (endTime.isBefore(startTime) || endTime.isEqual(startTime)) {
+            throw new IllegalStateException("Thời gian kết thúc phải sau thời gian bắt đầu");
+        }
+
+        Employee assignedTo = null;
+        ShiftStatus status = ShiftStatus.OPEN;
+
+        if (request.getAssignedToId() != null) {
+            assignedTo = employeeRepository.findById(request.getAssignedToId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên #" + request.getAssignedToId()));
+            status = ShiftStatus.ASSIGNED;
+        }
+
+        Shift shift = Shift.builder()
+                .title(request.getTitle())
+                .startTime(startTime)
+                .endTime(endTime)
+                .requiredLevel(request.getRequiredLevel() != null ? request.getRequiredLevel() : 1)
+                .branch(branch)
+                .requiredSkill(skill)
+                .assignedTo(assignedTo)
+                .status(status)
+                .build();
+
+        Shift saved = shiftRepository.save(shift);
+        log.info("[SHIFT] ✅ Đã tạo ca #{} ({})", saved.getId(), status);
+        return convertToDTO(saved);
+    }
 
     // ============================================================
     // MODULE 1: ĐỔI CA & TƯƠNG TRANH
@@ -93,7 +151,7 @@ public class ShiftService {
      * @param shiftId    ID ca cần nhận
      * @param employeeId ID nhân viên muốn nhận
      * @return ShiftDTO nếu nhận thành công
-     * @throws IllegalStateException nếu ca không OPEN, trùng lịch, hoặc bị người khác nhận trước
+     * @throws IllegalStateException nếu ca không OPEN, trùng lịch, lịch bận, hoặc bị người khác nhận trước
      */
     @Transactional
     public ShiftDTO takeShift(Long shiftId, Long employeeId) {
@@ -111,11 +169,18 @@ public class ShiftService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên #" + employeeId));
 
-        // Kiểm tra trùng lịch
+        // Kiểm tra trùng lịch ca
         boolean hasConflict = shiftRepository.hasScheduleConflict(
                 employeeId, shift.getStartTime(), shift.getEndTime());
         if (hasConflict) {
             throw new IllegalStateException("Bạn đã có ca trùng lịch trong khung giờ này");
+        }
+
+        // ★ Kiểm tra lịch bận
+        boolean isBusy = busyScheduleRepository.hasBusyConflict(
+                employeeId, shift.getStartTime(), shift.getEndTime());
+        if (isBusy) {
+            throw new IllegalStateException("Bạn đã đăng ký lịch bận trong khung giờ này. Hãy xóa lịch bận trước khi nhận ca.");
         }
 
         // Kiểm tra giờ/tuần
@@ -164,8 +229,9 @@ public class ShiftService {
      *
      * Flow:
      *   1. Repository lọc 3 điều kiện (skill, lịch, giờ/tuần)
-     *   2. AIService gửi sang Python chấm điểm
-     *   3. Trả về danh sách ranked theo Match Score giảm dần
+     *   2. Loại bỏ nhân viên đang bận (BusySchedule)
+     *   3. AIService gửi sang Python chấm điểm
+     *   4. Trả về danh sách ranked theo Match Score giảm dần
      *
      * @param shiftId ID ca cần tìm người phù hợp
      * @return AIMatchResponse chứa danh sách xếp hạng
@@ -204,7 +270,19 @@ public class ShiftService {
                 excludeId
         );
 
-        log.info("[MODULE 2] Lọc được {} nhân viên đủ điều kiện", eligible.size());
+        log.info("[MODULE 2] Lọc được {} nhân viên đủ điều kiện (trước khi lọc lịch bận)", eligible.size());
+
+        // ── Bước 1.5: Loại bỏ nhân viên đang bận ──
+        List<Long> busyEmployeeIds = busyScheduleRepository.findBusyEmployeeIds(
+                shift.getStartTime(), shift.getEndTime());
+
+        if (!busyEmployeeIds.isEmpty()) {
+            eligible = eligible.stream()
+                    .filter(emp -> !busyEmployeeIds.contains(emp.getId()))
+                    .collect(Collectors.toList());
+            log.info("[MODULE 2] Sau khi loại {} nhân viên bận → còn {} ứng viên",
+                    busyEmployeeIds.size(), eligible.size());
+        }
 
         if (eligible.isEmpty()) {
             return AIMatchResponse.builder()
@@ -262,6 +340,7 @@ public class ShiftService {
 
     /**
      * Tự động gán 1 ca OPEN cho người phù hợp nhất.
+     * ★ Tích hợp lọc lịch bận: loại nhân viên đang bận khỏi ứng viên.
      */
     private void autoAssignSingleShift(Shift shift) {
         log.info("[MODULE 3] Đang xử lý ca #{} (start: {})", shift.getId(), shift.getStartTime());
@@ -285,6 +364,15 @@ public class ShiftService {
                 shiftHours,
                 0L // Không loại trừ ai
         );
+
+        // ★ Loại bỏ nhân viên đang bận
+        List<Long> busyEmployeeIds = busyScheduleRepository.findBusyEmployeeIds(
+                shift.getStartTime(), shift.getEndTime());
+        if (!busyEmployeeIds.isEmpty()) {
+            eligible = eligible.stream()
+                    .filter(emp -> !busyEmployeeIds.contains(emp.getId()))
+                    .collect(Collectors.toList());
+        }
 
         if (eligible.isEmpty()) {
             log.warn("[MODULE 3] ⚠️ Không có nhân viên rảnh cho ca #{}", shift.getId());
@@ -381,6 +469,22 @@ public class ShiftService {
     }
 
     /**
+     * Lấy danh sách chi nhánh.
+     */
+    @Transactional(readOnly = true)
+    public List<Branch> getAllBranches() {
+        return branchRepository.findAll();
+    }
+
+    /**
+     * Lấy danh sách kỹ năng.
+     */
+    @Transactional(readOnly = true)
+    public List<Skill> getAllSkills() {
+        return skillRepository.findAll();
+    }
+
+    /**
      * Chuyển Shift entity → ShiftDTO cho API response.
      */
     private ShiftDTO convertToDTO(Shift shift) {
@@ -401,3 +505,4 @@ public class ShiftService {
                 .build();
     }
 }
+

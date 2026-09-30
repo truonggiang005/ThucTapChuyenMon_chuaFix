@@ -6,6 +6,7 @@ Spring Boot gửi danh sách nhân viên đủ điều kiện (đã lọc sơ b�
 Python trả về danh sách đã chấm điểm Match Score.
 """
 
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from typing import List, Optional
 

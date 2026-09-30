@@ -63,6 +63,7 @@
         <button class="tab-btn active" data-tab="tab-open" id="tabBtnOpen">🟢 Ca Đang Mở</button>
         <button class="tab-btn" data-tab="tab-my" id="tabBtnMy">📋 Lịch Của Tôi</button>
         <button class="tab-btn" data-tab="tab-all" id="tabBtnAll">📊 Tất Cả Ca</button>
+        <button class="tab-btn" data-tab="tab-admin" id="tabBtnAdmin">⚙️ Quản Lý</button>
     </nav>
 
     <!-- Tab 1: Ca Đang Mở -->
@@ -79,10 +80,39 @@
 
     <!-- Tab 2: Lịch Của Tôi -->
     <section class="tab-content" id="tab-my">
-        <div id="mySchedule">
-            <div class="empty-state">
-                <div class="empty-state__icon">👤</div>
-                <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
+        <div class="schedule-section">
+            <h3 style="margin-bottom: 16px; color: var(--accent-blue);">Ca Làm Việc Của Tôi</h3>
+            <div id="mySchedule">
+                <div class="empty-state">
+                    <div class="empty-state__icon">👤</div>
+                    <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="schedule-section" style="margin-top: 32px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin-bottom: 16px; color: var(--accent-orange);">Lịch Bận Của Tôi</h3>
+            
+            <div style="background: var(--bg-card); padding: 16px; border-radius: var(--radius-md); margin-bottom: 20px;">
+                <form id="busyScheduleForm" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Bắt đầu</label>
+                        <input type="datetime-local" id="busyStartTime" required style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Kết thúc</label>
+                        <input type="datetime-local" id="busyEndTime" required style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 2; min-width: 200px;">
+                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Lý do (Tùy chọn)</label>
+                        <input type="text" id="busyReason" placeholder="Vd: Nghỉ phép, khám bệnh..." style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                    <button type="submit" class="btn btn--primary" id="btnSubmitBusy">Đăng ký lịch bận</button>
+                </form>
+            </div>
+
+            <div id="myBusySchedules">
+                <!-- Sẽ render danh sách lịch bận ở đây -->
             </div>
         </div>
     </section>
@@ -94,6 +124,61 @@
                 <div class="empty-state__icon">⏳</div>
                 <div class="empty-state__text">Đang tải...</div>
             </div>
+        </div>
+    </section>
+
+    <!-- Tab 4: Quản Lý (Admin) -->
+    <section class="tab-content" id="tab-admin">
+        <div style="background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.1); max-width: 600px; margin: 0 auto;">
+            <h2 style="margin-bottom: 24px; color: var(--accent-blue);">Tạo Ca Làm Việc Mới</h2>
+            <form id="createShiftForm" style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <div>
+                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Tiêu đề ca</label>
+                    <input type="text" id="shiftTitle" required placeholder="Vd: Ca sáng - Pha chế" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Thời gian bắt đầu</label>
+                        <input type="datetime-local" id="shiftStartTime" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Thời gian kết thúc</label>
+                        <input type="datetime-local" id="shiftEndTime" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Chi nhánh</label>
+                        <select id="shiftBranch" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                            <option value="">Đang tải...</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Kỹ năng yêu cầu (Tùy chọn)</label>
+                        <select id="shiftSkill" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                            <option value="">Không yêu cầu</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Level kỹ năng</label>
+                        <input type="number" id="shiftLevel" min="1" max="5" value="1" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Gán trước cho NV (Tùy chọn)</label>
+                        <select id="shiftEmployee" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                            <option value="">Để trống (Trạng thái OPEN)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn--primary" style="margin-top: 16px; padding: 12px; font-size: 14px;">Tạo Ca Làm Việc</button>
+            </form>
         </div>
     </section>
 
