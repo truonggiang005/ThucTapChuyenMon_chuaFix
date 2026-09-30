@@ -43,15 +43,16 @@ public interface BusyScheduleRepository extends JpaRepository<BusySchedule, Long
     /**
      * Kiểm tra nhân viên có bị trùng lịch bận không.
      * Overlap condition: busyStart < newEnd AND busyEnd > newStart
+     * Trả về Long (COUNT) thay vì boolean vì MySQL native query trả Long.
      */
     @Query(value =
-            "SELECT CASE WHEN COUNT(*) > 0 THEN true ELSE false END " +
+            "SELECT COUNT(*) " +
             "FROM busy_schedules b " +
             "WHERE b.employee_id = :employeeId " +
             "AND b.start_time < :newEnd " +
             "AND b.end_time > :newStart",
             nativeQuery = true)
-    boolean hasBusyConflict(
+    Long countBusyConflict(
             @Param("employeeId") Long employeeId,
             @Param("newStart") LocalDateTime newStart,
             @Param("newEnd") LocalDateTime newEnd

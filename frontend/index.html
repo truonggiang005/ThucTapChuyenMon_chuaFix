@@ -3,182 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SmartSchedule - Hệ thống quản lý ca làm việc tích hợp AI chấm điểm và phân bổ nhân sự">
-    <title>SmartSchedule | AI-Powered Shift Management</title>
+    <meta name="description" content="FlexiShift AI - Hệ thống quản lý ca làm việc tích hợp AI chấm điểm và phân bổ nhân sự">
+    <title>FlexiShift AI | Smart Shift Management</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
 </head>
 <body>
 
-<!-- ═══════════════════ HEADER ═══════════════════ -->
-<header class="header">
-    <div class="header__logo">
-        <div class="header__logo-icon">⚡</div>
-        <div>
-            <div class="header__title">SmartSchedule</div>
-            <div class="header__subtitle">AI-Powered Shift Management</div>
-        </div>
-    </div>
-
-    <div class="header__user">
+<!-- ═══════════════════ HEADER / NAV ═══════════════════ -->
+<header class="header" id="mainHeader">
+    <div class="header__left">
+        <div class="header__brand">FlexiShift AI</div>
+        <nav class="header__nav">
+            <a href="#" class="nav-link active" data-page="personal-schedule" id="navPersonal">Lịch Cá Nhân</a>
+            <a href="#" class="nav-link" data-page="shift-market" id="navMarket">Chợ Ca Trực</a>
+            <a href="#" class="nav-link" data-page="account" id="navAccount">Tài Khoản</a>
+            <a href="#" class="nav-link" data-page="admin" id="navAdmin">⚙️ Quản Lý</a>
+        </nav>
         <div class="header__ai-status">
             <span class="header__ai-dot" id="aiStatusDot"></span>
-            <span id="aiStatusText">AI: Đang kiểm tra...</span>
+            <span id="aiStatusText">AI</span>
         </div>
-
+    </div>
+    <div class="header__right">
         <select class="header__user-select" id="currentUser">
             <option value="">Chọn nhân viên...</option>
         </select>
+        <div class="header__user-info" id="userInfoDisplay">
+            <span class="header__user-name" id="userName">—</span>
+            <span class="header__user-role">(Nhân viên)</span>
+        </div>
     </div>
 </header>
 
-<!-- ═══════════════════ MAIN ═══════════════════ -->
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
 <main class="main">
 
-    <!-- Stats Bar -->
-    <section class="stats-bar" id="statsBar">
-        <div class="stat-card">
-            <div class="stat-card__label">Tổng Ca</div>
-            <div class="stat-card__value stat-card__value--blue" id="statTotal">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card__label">Ca Đang Mở</div>
-            <div class="stat-card__value stat-card__value--green" id="statOpen">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card__label">Ca Đã Nhận</div>
-            <div class="stat-card__value stat-card__value--cyan" id="statTaken">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card__label">Auto Gán</div>
-            <div class="stat-card__value stat-card__value--orange" id="statForce">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card__label">Bỏ Trống</div>
-            <div class="stat-card__value stat-card__value--red" id="statUnfilled">0</div>
-        </div>
-    </section>
-
-    <!-- Tabs -->
-    <nav class="tabs">
-        <button class="tab-btn active" data-tab="tab-open" id="tabBtnOpen">🟢 Ca Đang Mở</button>
-        <button class="tab-btn" data-tab="tab-my" id="tabBtnMy">📋 Lịch Của Tôi</button>
-        <button class="tab-btn" data-tab="tab-all" id="tabBtnAll">📊 Tất Cả Ca</button>
-        <button class="tab-btn" data-tab="tab-admin" id="tabBtnAdmin">⚙️ Quản Lý</button>
-    </nav>
-
-    <!-- Tab 1: Ca Đang Mở -->
-    <section class="tab-content active" id="tab-open">
-        <div class="shifts-grid" id="openShiftsGrid">
-            <div class="empty-state">
-                <div class="empty-state__icon">⏳</div>
-                <div class="empty-state__text">Đang tải dữ liệu...</div>
-            </div>
-        </div>
-        <!-- AI Candidates Panel (hiển thị khi click "AI Gợi ý") -->
-        <div id="candidatesPanel"></div>
-    </section>
-
-    <!-- Tab 2: Lịch Của Tôi -->
-    <section class="tab-content" id="tab-my">
-        <div class="schedule-section">
-            <h3 style="margin-bottom: 16px; color: var(--accent-blue);">Ca Làm Việc Của Tôi</h3>
-            <div id="mySchedule">
+    <!-- ============ PAGE 1: Lịch Cá Nhân Tổng Hợp ============ -->
+    <section class="page active" id="page-personal-schedule">
+        <h1 class="page-title">Lịch Cá Nhân Tổng Hợp <span class="page-title__sub">(Integrated Personal Schedule)</span></h1>
+        
+        <div class="personal-layout">
+            <!-- LEFT: Weekly schedule -->
+            <div class="weekly-schedule" id="weeklySchedule">
                 <div class="empty-state">
                     <div class="empty-state__icon">👤</div>
                     <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
                 </div>
             </div>
-        </div>
 
-        <div class="schedule-section" style="margin-top: 32px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <h3 style="margin-bottom: 16px; color: var(--accent-orange);">Lịch Bận Của Tôi</h3>
-            
-            <div style="background: var(--bg-card); padding: 16px; border-radius: var(--radius-md); margin-bottom: 20px;">
-                <form id="busyScheduleForm" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px;">
-                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Bắt đầu</label>
-                        <input type="datetime-local" id="busyStartTime" required style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
-                    </div>
-                    <div style="flex: 1; min-width: 200px;">
-                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Kết thúc</label>
-                        <input type="datetime-local" id="busyEndTime" required style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
-                    </div>
-                    <div style="flex: 2; min-width: 200px;">
-                        <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-secondary);">Lý do (Tùy chọn)</label>
-                        <input type="text" id="busyReason" placeholder="Vd: Nghỉ phép, khám bệnh..." style="width: 100%; padding: 8px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
-                    </div>
-                    <button type="submit" class="btn btn--primary" id="btnSubmitBusy">Đăng ký lịch bận</button>
-                </form>
-            </div>
+            <!-- RIGHT: Busy schedule display + Registration -->
+            <div class="right-panel">
+                <!-- Busy schedule entries -->
+                <div class="busy-entries" id="busyEntriesDisplay">
+                    <!-- Will be populated dynamically -->
+                </div>
 
-            <div id="myBusySchedules">
-                <!-- Sẽ render danh sách lịch bận ở đây -->
+                <!-- Registration Panel -->
+                <div class="registration-panel">
+                    <h2 class="registration-panel__title">Bảng Đăng Ký Lịch Bận & Báo Nghỉ <span class="registration-panel__subtitle">(Unavailability Registration Panel)</span></h2>
+                    
+                    <form id="busyScheduleForm" class="busy-form">
+                        <div class="busy-form__row">
+                            <div class="busy-form__group">
+                                <label class="form-label">📅 Chọn ngày:</label>
+                                <input type="date" id="busyDate" class="form-input" required>
+                            </div>
+                            <div class="busy-form__group">
+                                <label class="form-label">⏰ Giờ bắt đầu:</label>
+                                <div class="time-range">
+                                    <input type="time" id="busyStartTime" class="form-input form-input--time" value="14:00" required>
+                                    <span class="time-separator">-</span>
+                                    <input type="time" id="busyEndTime" class="form-input form-input--time" value="18:00" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="busy-form__row">
+                            <div class="busy-form__group busy-form__group--wide">
+                                <label class="form-label">✏️ Lý do (Optional):</label>
+                                <input type="text" id="busyReason" class="form-input" placeholder="Khám bệnh, Việc gia đình">
+                            </div>
+                            <div class="busy-form__stats" id="busyStats">
+                                <h4>📊 Thống kê Lịch Bận:</h4>
+                                <p>- Số ngày nghỉ còn lại: <strong>10</strong> (Sử dụng cho tháng này)</p>
+                                <p>- <strong>Cập nhật:</strong> Lịch được cập nhật tự động hàng ngày lúc 00:00</p>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn--primary btn--register" id="btnSubmitBusy">Đăng ký Lịch Bận</button>
+                    </form>
+
+                    <!-- Success message area -->
+                    <div class="busy-success-msg" id="busySuccessMsg" style="display: none;">
+                        <span class="busy-success-msg__icon">✅</span>
+                        <span id="busySuccessText">Đăng ký lịch bận thành công!</span>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Tab 3: Tất Cả Ca -->
-    <section class="tab-content" id="tab-all">
-        <div class="shifts-grid" id="allShiftsGrid">
+    <!-- ============ PAGE 2: Chợ Ca Trực (Shift Marketplace) ============ -->
+    <section class="page" id="page-shift-market">
+        <h1 class="page-title page-title--center">Chợ Ca Trực</h1>
+        
+        <!-- Filters -->
+        <div class="market-filters">
+            <div class="filter-group">
+                <label class="filter-label">Chi nhánh</label>
+                <select class="filter-select" id="filterBranch">
+                    <option value="">Chi nhánh</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Vị trí</label>
+                <select class="filter-select" id="filterSkill">
+                    <option value="">All Vị trí</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Shift cards grid -->
+        <div class="market-grid" id="marketGrid">
             <div class="empty-state">
                 <div class="empty-state__icon">⏳</div>
-                <div class="empty-state__text">Đang tải...</div>
+                <div class="empty-state__text">Đang tải dữ liệu...</div>
+            </div>
+        </div>
+
+        <!-- AI Candidates Panel -->
+        <div id="candidatesPanel"></div>
+    </section>
+
+    <!-- ============ PAGE 3: Tài Khoản ============ -->
+    <section class="page" id="page-account">
+        <h1 class="page-title">Tài Khoản</h1>
+        <div class="account-card" id="accountInfo">
+            <div class="empty-state">
+                <div class="empty-state__icon">👤</div>
+                <div class="empty-state__text">Vui lòng chọn nhân viên để xem thông tin</div>
             </div>
         </div>
     </section>
 
-    <!-- Tab 4: Quản Lý (Admin) -->
-    <section class="tab-content" id="tab-admin">
-        <div style="background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.1); max-width: 600px; margin: 0 auto;">
-            <h2 style="margin-bottom: 24px; color: var(--accent-blue);">Tạo Ca Làm Việc Mới</h2>
-            <form id="createShiftForm" style="display: flex; flex-direction: column; gap: 16px;">
-                
-                <div>
-                    <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Tiêu đề ca</label>
-                    <input type="text" id="shiftTitle" required placeholder="Vd: Ca sáng - Pha chế" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+    <!-- ============ PAGE 4: Quản Lý (Admin) ============ -->
+    <section class="page" id="page-admin">
+        <h1 class="page-title">Quản Lý Ca Làm Việc</h1>
+        
+        <!-- Stats Bar -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-card">
+                <div class="stat-card__label">Tổng Ca</div>
+                <div class="stat-card__value stat-card__value--blue" id="statTotal">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Ca Đang Mở</div>
+                <div class="stat-card__value stat-card__value--green" id="statOpen">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Ca Đã Nhận</div>
+                <div class="stat-card__value stat-card__value--cyan" id="statTaken">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Auto Gán</div>
+                <div class="stat-card__value stat-card__value--orange" id="statForce">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Bỏ Trống</div>
+                <div class="stat-card__value stat-card__value--red" id="statUnfilled">0</div>
+            </div>
+        </div>
+
+        <!-- Create Shift Form -->
+        <div class="admin-form-container">
+            <h2 class="admin-form__title">Tạo Ca Làm Việc Mới</h2>
+            <form id="createShiftForm" class="admin-form">
+                <div class="admin-form__group">
+                    <label class="form-label">Tiêu đề ca</label>
+                    <input type="text" id="shiftTitle" required placeholder="Vd: Ca sáng - Pha chế" class="form-input">
                 </div>
 
-                <div style="display: flex; gap: 16px;">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Thời gian bắt đầu</label>
-                        <input type="datetime-local" id="shiftStartTime" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Thời gian bắt đầu</label>
+                        <input type="datetime-local" id="shiftStartTime" required class="form-input">
                     </div>
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Thời gian kết thúc</label>
-                        <input type="datetime-local" id="shiftEndTime" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    <div class="admin-form__group">
+                        <label class="form-label">Thời gian kết thúc</label>
+                        <input type="datetime-local" id="shiftEndTime" required class="form-input">
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 16px;">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Chi nhánh</label>
-                        <select id="shiftBranch" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Chi nhánh</label>
+                        <select id="shiftBranch" required class="form-input">
                             <option value="">Đang tải...</option>
                         </select>
                     </div>
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Kỹ năng yêu cầu (Tùy chọn)</label>
-                        <select id="shiftSkill" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    <div class="admin-form__group">
+                        <label class="form-label">Kỹ năng yêu cầu (Tùy chọn)</label>
+                        <select id="shiftSkill" class="form-input">
                             <option value="">Không yêu cầu</option>
                         </select>
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 16px;">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Level kỹ năng</label>
-                        <input type="number" id="shiftLevel" min="1" max="5" value="1" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Level kỹ năng</label>
+                        <input type="number" id="shiftLevel" min="1" max="5" value="1" required class="form-input">
                     </div>
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-secondary);">Gán trước cho NV (Tùy chọn)</label>
-                        <select id="shiftEmployee" style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    <div class="admin-form__group">
+                        <label class="form-label">Gán trước cho NV (Tùy chọn)</label>
+                        <select id="shiftEmployee" class="form-input">
                             <option value="">Để trống (Trạng thái OPEN)</option>
                         </select>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn--primary" style="margin-top: 16px; padding: 12px; font-size: 14px;">Tạo Ca Làm Việc</button>
+                <button type="submit" class="btn btn--primary btn--full">Tạo Ca Làm Việc</button>
             </form>
+        </div>
+
+        <!-- All shifts grid (admin view) -->
+        <div class="admin-shifts-section">
+            <h2 class="admin-form__title" style="margin-top: 32px;">Tất Cả Ca Làm Việc</h2>
+            <div class="shifts-grid" id="allShiftsGrid">
+                <div class="empty-state">
+                    <div class="empty-state__icon">⏳</div>
+                    <div class="empty-state__text">Đang tải...</div>
+                </div>
+            </div>
         </div>
     </section>
 

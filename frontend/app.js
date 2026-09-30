@@ -1,12 +1,12 @@
 /**
- * SmartSchedule - Frontend Application (Vanilla JS + Fetch API)
+ * FlexiShift AI - Frontend Application (Redesigned)
  *
  * Giao tiếp với Spring Boot REST API (http://localhost:8080/api/...)
- * Xử lý:
- *   - Hiển thị danh sách ca (OPEN, ALL, MY SCHEDULE)
- *   - Nhả ca / Nhận ca (Module 1)
- *   - Xem AI Match Score (Module 2)
- *   - Toast notifications cho UX
+ * Pages:
+ *   1. Lịch Cá Nhân Tổng Hợp (Personal Schedule)
+ *   2. Chợ Ca Trực (Shift Marketplace)
+ *   3. Tài Khoản (Account)
+ *   4. Quản Lý (Admin)
  */
 
 // ============================================================
@@ -19,14 +19,21 @@ const AI_HEALTH_URL = 'http://localhost:8000/api/v1/health';
 let currentEmployeeId = null;
 let allShifts = [];
 let employees = [];
+let branches = [];
+let skills = [];
+
+// Day name mapping
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat'];
+const DAY_NAMES_VI = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
 // ============================================================
 // KHỞI TẠO
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    initTabs();
+    initNavigation();
     loadEmployees();
     loadAllShifts();
+    loadFilterOptions();
     checkAIHealth();
 
     // Kiểm tra AI health mỗi 30 giây
@@ -35,37 +42,68 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listener chọn nhân viên
     document.getElementById('currentUser').addEventListener('change', (e) => {
         currentEmployeeId = e.target.value ? parseInt(e.target.value) : null;
-        refreshAll();
-    });
-});
-
-// ============================================================
-// TABS
-// ============================================================
-function initTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            // Deactivate all
-            tabBtns.forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-            // Activate selected
-            btn.classList.add('active');
-            const tabId = btn.getAttribute('data-tab');
-            document.getElementById(tabId).classList.add('active');
-
-            // Load data for the tab
-            if (tabId === 'tab-open') loadOpenShifts();
-            if (tabId === 'tab-my') loadMySchedule();
-            if (tabId === 'tab-all') loadAllShifts();
-            if (tabId === 'tab-admin') loadCreateShiftOptions();
-        });
+        updateUserDisplay();
+        refreshCurrentPage();
     });
 
     // Form listeners
     document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
     document.getElementById('busyScheduleForm')?.addEventListener('submit', handleCreateBusySchedule);
+
+    // Filter listeners
+    document.getElementById('filterBranch')?.addEventListener('change', loadMarketShifts);
+    document.getElementById('filterSkill')?.addEventListener('change', loadMarketShifts);
+});
+
+// ============================================================
+// NAVIGATION (Pages)
+// ============================================================
+function initNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            // Deactivate all
+            navLinks.forEach(l => l.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+            // Activate selected
+            link.classList.add('active');
+            const pageId = 'page-' + link.getAttribute('data-page');
+            document.getElementById(pageId).classList.add('active');
+
+            // Load data for the page
+            const page = link.getAttribute('data-page');
+            if (page === 'personal-schedule') loadPersonalSchedule();
+            if (page === 'shift-market') loadMarketShifts();
+            if (page === 'account') loadAccountInfo();
+            if (page === 'admin') { loadCreateShiftOptions(); loadAllShifts(); }
+        });
+    });
+}
+
+function refreshCurrentPage() {
+    const activePage = document.querySelector('.nav-link.active');
+    if (activePage) {
+        const page = activePage.getAttribute('data-page');
+        if (page === 'personal-schedule') loadPersonalSchedule();
+        if (page === 'shift-market') loadMarketShifts();
+        if (page === 'account') loadAccountInfo();
+        if (page === 'admin') { loadAllShifts(); }
+    }
+}
+
+function updateUserDisplay() {
+    const nameEl = document.getElementById('userName');
+    if (currentEmployeeId) {
+        const emp = employees.find(e => e.id === currentEmployeeId);
+        if (emp) {
+            nameEl.textContent = emp.fullName;
+        }
+    } else {
+        nameEl.textContent = '—';
+    }
 }
 
 // ============================================================
@@ -80,15 +118,25 @@ async function apiFetch(url, options = {}) {
             ...options
         });
 
-        const data = await res.json();
+        // Try parsing JSON response
+        let data;
+        const text = await res.text();
+        try {
+            data = JSON.parse(text);
+        } catch {
+            console.error('[apiFetch] Non-JSON response:', text);
+            if (!res.ok) throw new Error(`Lỗi server (HTTP ${res.status})`);
+            return text;
+        }
 
         if (!res.ok) {
-            throw new Error(data.message || `HTTP ${res.status}`);
+            console.error('[apiFetch] Error response:', data);
+            throw new Error(data.message || `HTTP ${res.status}: ${JSON.stringify(data)}`);
         }
 
         return data;
     } catch (err) {
-        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('Load failed')) {
             throw new Error('Không thể kết nối đến server. Kiểm tra Spring Boot đã chạy chưa.');
         }
         throw err;
@@ -115,89 +163,39 @@ async function loadEmployees() {
     }
 }
 
+/** Load filter options for marketplace */
+async function loadFilterOptions() {
+    try {
+        const [branchList, skillList] = await Promise.all([
+            apiFetch(`${API_BASE}/shifts/branches`),
+            apiFetch(`${API_BASE}/shifts/skills`)
+        ]);
+
+        branches = branchList;
+        skills = skillList;
+
+        // Populate branch filter
+        const branchSelect = document.getElementById('filterBranch');
+        branchSelect.innerHTML = '<option value="">Chi nhánh</option>' +
+            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+        // Populate skill filter
+        const skillSelect = document.getElementById('filterSkill');
+        skillSelect.innerHTML = '<option value="">All Vị trí</option>' +
+            skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    } catch (err) {
+        // Silently fail, filters will just not populate
+    }
+}
+
 /** Tải tất cả ca → cập nhật stats + grid */
 async function loadAllShifts() {
     try {
         allShifts = await apiFetch(`${API_BASE}/shifts`);
         updateStats();
-        renderShiftsGrid('allShiftsGrid', allShifts);
+        renderAdminShiftsGrid('allShiftsGrid', allShifts);
     } catch (err) {
         showToast('Lỗi tải danh sách ca: ' + err.message, 'error');
-    }
-}
-
-/** Tải ca OPEN */
-async function loadOpenShifts() {
-    try {
-        const shifts = await apiFetch(`${API_BASE}/shifts/open`);
-        renderShiftsGrid('openShiftsGrid', shifts, true);
-    } catch (err) {
-        showToast('Lỗi tải ca mở: ' + err.message, 'error');
-    }
-}
-
-/** Tải lịch làm việc của nhân viên đang chọn */
-async function loadMySchedule() {
-    const container = document.getElementById('mySchedule');
-
-    if (!currentEmployeeId) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state__icon">👤</div>
-                <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
-            </div>`;
-        document.getElementById('myBusySchedules').innerHTML = '';
-        return;
-    }
-
-    try {
-        loadMyBusySchedules(); // Tải lịch bận
-        
-        const shifts = await apiFetch(`${API_BASE}/shifts/employee/${currentEmployeeId}`);
-
-        if (shifts.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state__icon">📭</div>
-                    <div class="empty-state__text">Chưa có ca nào được gán</div>
-                </div>`;
-            return;
-        }
-
-        container.innerHTML = `
-            <table class="schedule-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tiêu đề</th>
-                        <th>Thời gian</th>
-                        <th>Chi nhánh</th>
-                        <th>Kỹ năng</th>
-                        <th>Trạng thái</th>
-                        <th>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${shifts.map(s => `
-                        <tr>
-                            <td>#${s.id}</td>
-                            <td>${s.title}</td>
-                            <td>${formatTimeRange(s.startTime, s.endTime)}</td>
-                            <td>${s.branchName || '—'}</td>
-                            <td>${s.requiredSkillName || '—'} (Lv${s.requiredLevel})</td>
-                            <td><span class="shift-card__status status--${s.status}">${formatStatus(s.status)}</span></td>
-                            <td>
-                                ${s.status === 'ASSIGNED' ?
-                                    `<button class="btn btn--danger btn--sm" onclick="releaseShift(${s.id})">
-                                        Nhả ca
-                                    </button>` : '—'}
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>`;
-    } catch (err) {
-        showToast('Lỗi tải lịch làm việc: ' + err.message, 'error');
     }
 }
 
@@ -210,15 +208,301 @@ async function checkAIHealth() {
         const res = await fetch(AI_HEALTH_URL, { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
             dot.classList.add('healthy');
-            text.textContent = 'AI: Online';
+            text.textContent = 'AI';
         } else {
             dot.classList.remove('healthy');
-            text.textContent = 'AI: Offline';
+            text.textContent = 'AI';
         }
     } catch {
         dot.classList.remove('healthy');
-        text.textContent = 'AI: Offline';
+        text.textContent = 'AI';
     }
+}
+
+// ============================================================
+// PAGE 1: LỊCH CÁ NHÂN TỔNG HỢP
+// ============================================================
+
+async function loadPersonalSchedule() {
+    const container = document.getElementById('weeklySchedule');
+
+    if (!currentEmployeeId) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state__icon">👤</div>
+                <div class="empty-state__text">Vui lòng chọn nhân viên ở menu trên</div>
+            </div>`;
+        document.getElementById('busyEntriesDisplay').innerHTML = '';
+        return;
+    }
+
+    try {
+        // Load shifts + busy schedules concurrently
+        const [shifts, busySchedules] = await Promise.all([
+            apiFetch(`${API_BASE}/shifts/employee/${currentEmployeeId}`),
+            apiFetch(`${API_BASE}/busy-schedules/employee/${currentEmployeeId}`).catch(() => [])
+        ]);
+
+        // Render weekly schedule
+        renderWeeklySchedule(container, shifts);
+
+        // Render busy entries on right panel
+        renderBusyEntries(busySchedules);
+
+    } catch (err) {
+        showToast('Lỗi tải lịch cá nhân: ' + err.message, 'error');
+    }
+}
+
+function renderWeeklySchedule(container, shifts) {
+    if (!shifts || shifts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state__icon">📭</div>
+                <div class="empty-state__text">Chưa có ca nào được gán</div>
+            </div>`;
+        return;
+    }
+
+    // Group shifts by day of week
+    const grouped = {};
+    shifts.forEach(s => {
+        const date = new Date(s.startTime);
+        const dayIndex = date.getDay(); // 0=Sun ... 6=Sat
+        const dayKey = DAY_NAMES[dayIndex];
+        if (!grouped[dayKey]) grouped[dayKey] = [];
+        grouped[dayKey].push(s);
+    });
+
+    // Render in order Mon-Sun
+    const dayOrder = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
+    let html = '';
+
+    dayOrder.forEach(day => {
+        const dayShifts = grouped[day];
+        if (!dayShifts || dayShifts.length === 0) return;
+
+        html += `<div class="day-group">
+            <div class="day-group__label">${day}</div>
+            <div class="day-group__shifts">`;
+
+        dayShifts.forEach(s => {
+            const isForce = s.status === 'FORCE_ASSIGNED';
+            const statusClass = isForce ? 'force' : s.status.toLowerCase();
+            const startTime = formatTime(s.startTime);
+            const endTime = formatTime(s.endTime);
+
+            html += `
+                <div class="schedule-card schedule-card--${statusClass}">
+                    <div class="schedule-card__header">
+                        <div class="schedule-card__title">Ca #${s.id} - ${s.requiredSkillName || s.title} <span class="schedule-card__status schedule-card__status--${s.status}">(${s.status})</span></div>
+                    </div>
+                    <div class="schedule-card__meta">
+                        <span>📍 ${s.branchName || 'Chưa xác định'}</span>
+                        <span>🕐 ${startTime} - ${endTime}</span>
+                    </div>
+                    ${s.status === 'ASSIGNED' || s.status === 'TAKEN' ? `
+                        <div class="schedule-card__action">
+                            <button class="btn-release" onclick="releaseShift(${s.id})">Nhả ca</button>
+                        </div>` : ''}
+                    ${isForce ? `
+                        <div class="schedule-card__action">
+                            <button class="btn-release btn-release--red" onclick="releaseShift(${s.id})">Nhả ca</button>
+                        </div>` : ''}
+                </div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html || `
+        <div class="empty-state">
+            <div class="empty-state__icon">📭</div>
+            <div class="empty-state__text">Chưa có ca nào được gán</div>
+        </div>`;
+}
+
+function renderBusyEntries(busySchedules) {
+    const container = document.getElementById('busyEntriesDisplay');
+
+    if (!busySchedules || busySchedules.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = busySchedules.map(s => {
+        const date = new Date(s.startTime);
+        const dayName = DAY_NAMES_VI[date.getDay()];
+        const startTime = formatTime(s.startTime);
+        const endTime = formatTime(s.endTime);
+
+        return `
+            <div class="busy-entry-card">
+                <button class="busy-entry-card__delete" onclick="deleteBusySchedule(${s.id})" title="Xóa">✕</button>
+                <div class="busy-entry-card__title">
+                    🕐 | ${s.reason || 'Bận việc riêng'} (${s.reason || 'Lý do không xác định'})
+                </div>
+                <div class="busy-entry-card__detail">
+                    📅 ${dayName}, ${startTime} - ${endTime}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// ============================================================
+// PAGE 2: CHỢ CA TRỰC (SHIFT MARKETPLACE)
+// ============================================================
+
+async function loadMarketShifts() {
+    const grid = document.getElementById('marketGrid');
+
+    try {
+        const branchId = document.getElementById('filterBranch').value;
+        const skillId = document.getElementById('filterSkill').value;
+
+        let url = `${API_BASE}/shifts/open`;
+        if (branchId) url += `?branchId=${branchId}`;
+
+        let shifts = await apiFetch(url);
+
+        // Client-side filter by skill
+        if (skillId) {
+            shifts = shifts.filter(s => s.requiredSkillId && s.requiredSkillId.toString() === skillId);
+        }
+
+        if (!shifts || shifts.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <div class="empty-state__icon">📭</div>
+                    <div class="empty-state__text">Không có ca trực nào đang mở</div>
+                </div>`;
+            return;
+        }
+
+        // If user is selected, try to get AI scores for all shifts
+        let aiScores = {};
+        if (currentEmployeeId) {
+            // Get AI scores for each open shift (fire and forget errors)
+            const scorePromises = shifts.map(async (s) => {
+                try {
+                    const data = await apiFetch(`${API_BASE}/shifts/${s.id}/candidates`);
+                    if (data.ranked_candidates) {
+                        const myScore = data.ranked_candidates.find(c => c.employee_id === currentEmployeeId);
+                        if (myScore) {
+                            aiScores[s.id] = myScore.match_score;
+                        }
+                    }
+                } catch {
+                    // Silently skip - AI might be offline
+                }
+            });
+            await Promise.allSettled(scorePromises);
+        }
+
+        renderMarketGrid(grid, shifts, aiScores);
+    } catch (err) {
+        showToast('Lỗi tải chợ ca trực: ' + err.message, 'error');
+    }
+}
+
+function renderMarketGrid(container, shifts, aiScores = {}) {
+    container.innerHTML = shifts.map(s => {
+        const startTime = formatTime(s.startTime);
+        const endTime = formatTime(s.endTime);
+        const score = aiScores[s.id];
+        const hasScore = score !== undefined && score !== null;
+
+        let badgeClass = 'ai-badge--mid';
+        let badgeText = 'Phù hợp';
+        if (hasScore) {
+            if (score >= 80) { badgeClass = 'ai-badge--high'; badgeText = 'Phù hợp rất cao'; }
+            else if (score >= 50) { badgeClass = 'ai-badge--mid'; badgeText = 'Phù hợp'; }
+            else { badgeClass = 'ai-badge--low'; badgeText = 'Ít phù hợp'; }
+        }
+
+        return `
+            <div class="market-card">
+                <div class="market-card__header">
+                    <div class="market-card__title">Ca làm #${s.id} - ${s.requiredSkillName || s.title} <span class="market-card__status">(MỞ)</span></div>
+                </div>
+                <div class="market-card__details">
+                    <span>🕐 ${startTime} - ${endTime}</span>
+                    <span>📍 ${s.branchName || 'Chưa xác định'}</span>
+                </div>
+                ${hasScore ? `
+                    <div class="market-card__ai-row">
+                        <span class="market-card__ai-score">
+                            <span class="ai-icon">🔵</span> AI Match Score: ${Math.round(score)}%
+                        </span>
+                        <span class="ai-badge ${badgeClass}">${badgeText}</span>
+                    </div>` : ''}
+                <div class="market-card__requirement">
+                    Yêu cầu: ${s.requiredSkillName || 'Không yêu cầu'} | Mức ${s.requiredLevel}
+                </div>
+                <div class="market-card__action">
+                    <button class="btn-take" onclick="takeShift(${s.id})"
+                        ${!currentEmployeeId ? 'disabled title="Chọn nhân viên trước"' : ''}>
+                        Đăng ký nhận ca
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// ============================================================
+// PAGE 3: TÀI KHOẢN
+// ============================================================
+
+function loadAccountInfo() {
+    const container = document.getElementById('accountInfo');
+
+    if (!currentEmployeeId) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state__icon">👤</div>
+                <div class="empty-state__text">Vui lòng chọn nhân viên để xem thông tin</div>
+            </div>`;
+        return;
+    }
+
+    const emp = employees.find(e => e.id === currentEmployeeId);
+    if (!emp) return;
+
+    container.innerHTML = `
+        <div class="account-info-list">
+            <div class="account-info-item">
+                <span class="account-info-item__label">Họ tên</span>
+                <span class="account-info-item__value">${emp.fullName}</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Email</span>
+                <span class="account-info-item__value">${emp.email}</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Giờ tối đa/tuần</span>
+                <span class="account-info-item__value">${emp.maxHoursPerWeek || '—'}h</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Ca hoàn thành</span>
+                <span class="account-info-item__value">${emp.totalCompleted || 0}</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Ca đã hủy</span>
+                <span class="account-info-item__value">${emp.totalCancelled || 0}</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Đi trễ</span>
+                <span class="account-info-item__value">${emp.lateArrivalCount || 0} lần</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Giờ ưu tiên</span>
+                <span class="account-info-item__value">${emp.preferredTime || '—'}</span>
+            </div>
+            <div class="account-info-item">
+                <span class="account-info-item__label">Chi nhánh chính</span>
+                <span class="account-info-item__value">${emp.primaryBranchName || '—'}</span>
+            </div>
+        </div>`;
 }
 
 // ============================================================
@@ -228,23 +512,23 @@ async function checkAIHealth() {
 /** Tải dữ liệu cho form tạo ca */
 async function loadCreateShiftOptions() {
     try {
-        const [branches, skills] = await Promise.all([
+        const [branchList, skillList] = await Promise.all([
             apiFetch(`${API_BASE}/shifts/branches`),
             apiFetch(`${API_BASE}/shifts/skills`)
         ]);
 
         const branchSelect = document.getElementById('shiftBranch');
-        branchSelect.innerHTML = '<option value="">-- Chọn chi nhánh --</option>' + 
-            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        branchSelect.innerHTML = '<option value="">-- Chọn chi nhánh --</option>' +
+            branchList.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
         const skillSelect = document.getElementById('shiftSkill');
-        skillSelect.innerHTML = '<option value="">-- Không yêu cầu --</option>' + 
-            skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        skillSelect.innerHTML = '<option value="">-- Không yêu cầu --</option>' +
+            skillList.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
         const empSelect = document.getElementById('shiftEmployee');
-        empSelect.innerHTML = '<option value="">-- Để trống (Trạng thái OPEN) --</option>' + 
+        empSelect.innerHTML = '<option value="">-- Để trống (Trạng thái OPEN) --</option>' +
             employees.map(e => `<option value="${e.id}">${e.fullName}</option>`).join('');
-            
+
     } catch (err) {
         showToast('Lỗi tải dữ liệu form tạo ca: ' + err.message, 'error');
     }
@@ -253,7 +537,7 @@ async function loadCreateShiftOptions() {
 /** Xử lý submit form tạo ca */
 async function handleCreateShift(e) {
     e.preventDefault();
-    
+
     const request = {
         title: document.getElementById('shiftTitle').value,
         startTime: document.getElementById('shiftStartTime').value,
@@ -269,13 +553,10 @@ async function handleCreateShift(e) {
             method: 'POST',
             body: JSON.stringify(request)
         });
-        
+
         showToast('✅ ' + result.message, 'success');
-        e.target.reset(); // Reset form
-        
-        // Chuyển về tab Tất cả ca
-        document.getElementById('tabBtnAll').click();
-        refreshAll();
+        e.target.reset();
+        loadAllShifts();
     } catch (err) {
         showToast('❌ ' + err.message, 'error');
     }
@@ -285,47 +566,6 @@ async function handleCreateShift(e) {
 // EMPLOYEE: LỊCH BẬN (BUSY SCHEDULE)
 // ============================================================
 
-/** Tải danh sách lịch bận của tôi */
-async function loadMyBusySchedules() {
-    const container = document.getElementById('myBusySchedules');
-    if (!currentEmployeeId) return;
-
-    try {
-        const schedules = await apiFetch(`${API_BASE}/busy-schedules/employee/${currentEmployeeId}`);
-        
-        if (schedules.length === 0) {
-            container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; background: var(--bg-glass); border-radius: 8px;">Bạn chưa đăng ký lịch bận nào sắp tới.</div>`;
-            return;
-        }
-
-        container.innerHTML = `
-            <table class="schedule-table">
-                <thead>
-                    <tr>
-                        <th>Thời gian bận</th>
-                        <th>Lý do</th>
-                        <th>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${schedules.map(s => `
-                        <tr>
-                            <td>${formatTimeRange(s.startTime, s.endTime)}</td>
-                            <td>${s.reason || '—'}</td>
-                            <td>
-                                <button class="btn btn--outline btn--sm" style="color: var(--accent-red); border-color: var(--accent-red);" onclick="deleteBusySchedule(${s.id})">
-                                    Xóa
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>`;
-    } catch (err) {
-        showToast('Lỗi tải lịch bận: ' + err.message, 'error');
-    }
-}
-
 /** Đăng ký lịch bận mới */
 async function handleCreateBusySchedule(e) {
     e.preventDefault();
@@ -333,23 +573,53 @@ async function handleCreateBusySchedule(e) {
         showToast('Vui lòng chọn nhân viên trước', 'error');
         return;
     }
-    
+
+    const busyDate = document.getElementById('busyDate').value;
+    const startTimeVal = document.getElementById('busyStartTime').value;
+    const endTimeVal = document.getElementById('busyEndTime').value;
+
+    if (!busyDate) {
+        showToast('Vui lòng chọn ngày', 'error');
+        return;
+    }
+
+    if (!startTimeVal || !endTimeVal) {
+        showToast('Vui lòng chọn giờ bắt đầu và kết thúc', 'error');
+        return;
+    }
+
+    // Ensure time format is HH:mm (input type=time always returns HH:mm or HH:mm:ss)
+    const startTimeFmt = startTimeVal.length === 5 ? startTimeVal + ':00' : startTimeVal;
+    const endTimeFmt = endTimeVal.length === 5 ? endTimeVal + ':00' : endTimeVal;
+
     const request = {
         employeeId: currentEmployeeId,
-        startTime: document.getElementById('busyStartTime').value,
-        endTime: document.getElementById('busyEndTime').value,
-        reason: document.getElementById('busyReason').value
+        startTime: `${busyDate}T${startTimeFmt}`,
+        endTime: `${busyDate}T${endTimeFmt}`,
+        reason: document.getElementById('busyReason').value || ''
     };
+
+    console.log('[BusySchedule] Sending request:', JSON.stringify(request));
 
     try {
         const result = await apiFetch(`${API_BASE}/busy-schedules`, {
             method: 'POST',
             body: JSON.stringify(request)
         });
-        
+
+        // Show inline success message
+        const successMsg = document.getElementById('busySuccessMsg');
+        const date = new Date(request.startTime);
+        const dayName = DAY_NAMES_VI[date.getDay()];
+        document.getElementById('busySuccessText').textContent =
+            `Đăng ký lịch bận ${dayName} thành công! (Cập nhật sau 00h00)`;
+        successMsg.style.display = 'flex';
+
+        setTimeout(() => { successMsg.style.display = 'none'; }, 5000);
+
         showToast('✅ ' + result.message, 'success');
-        e.target.reset(); // Reset form
-        loadMyBusySchedules(); // Refresh danh sách
+        e.target.reset();
+        loadPersonalSchedule(); // Refresh
     } catch (err) {
         showToast('❌ ' + err.message, 'error');
     }
@@ -358,14 +628,14 @@ async function handleCreateBusySchedule(e) {
 /** Xóa lịch bận */
 async function deleteBusySchedule(busyId) {
     if (!confirm('Bạn có chắc muốn xóa lịch bận này?')) return;
-    
+
     try {
         const result = await apiFetch(`${API_BASE}/busy-schedules/${busyId}?employeeId=${currentEmployeeId}`, {
             method: 'DELETE'
         });
-        
+
         showToast('✅ ' + result.message, 'success');
-        loadMyBusySchedules(); // Refresh danh sách
+        loadPersonalSchedule(); // Refresh
     } catch (err) {
         showToast('❌ ' + err.message, 'error');
     }
@@ -406,17 +676,20 @@ async function takeShift(shiftId) {
         return;
     }
 
-    if (!confirm('Bạn có muốn nhận ca này?')) return;
+    if (!confirm('Bạn có muốn đăng ký nhận ca này?')) return;
+
+    console.log('[TakeShift] shiftId:', shiftId, 'employeeId:', currentEmployeeId);
 
     try {
         const result = await apiFetch(
             `${API_BASE}/shifts/${shiftId}/take?employeeId=${currentEmployeeId}`,
             { method: 'POST' }
         );
-        showToast('✅ ' + result.message, 'success');
+        showToast('✅ ' + (result.message || 'Đăng ký nhận ca thành công!'), 'success');
         closeCandidatesPanel();
         refreshAll();
     } catch (err) {
+        console.error('[TakeShift] Error:', err);
         // ★ Lỗi tương tranh (409) sẽ hiện thông báo thân thiện
         showToast('❌ ' + err.message, 'error');
         refreshAll(); // Reload để thấy trạng thái mới
@@ -464,9 +737,9 @@ async function showCandidates(shiftId) {
                     <div class="candidate-row__info">
                         <div class="candidate-row__name">${c.full_name}</div>
                         <div class="candidate-row__details">
-                            Tin cậy: ${breakdown.reliability ?? '—'}% · 
-                            Kỹ năng: ${breakdown.skill_fit ?? '—'}% · 
-                            Giờ phù hợp: ${breakdown.time_fit ?? '—'}% · 
+                            Tin cậy: ${breakdown.reliability ?? '—'}% ·
+                            Kỹ năng: ${breakdown.skill_fit ?? '—'}% ·
+                            Giờ phù hợp: ${breakdown.time_fit ?? '—'}% ·
                             Khối lượng: ${breakdown.workload_fit ?? '—'}%
                         </div>
                     </div>
@@ -532,11 +805,11 @@ function closeCandidatesPanel() {
 }
 
 // ============================================================
-// RENDER UI
+// RENDER UI - ADMIN
 // ============================================================
 
-/** Render grid ca làm việc */
-function renderShiftsGrid(containerId, shifts, showActions = false) {
+/** Render admin grid ca làm việc */
+function renderAdminShiftsGrid(containerId, shifts) {
     const container = document.getElementById(containerId);
 
     if (!shifts || shifts.length === 0) {
@@ -553,7 +826,7 @@ function renderShiftsGrid(containerId, shifts, showActions = false) {
         const isMyShift = s.assignedToId && s.assignedToId === currentEmployeeId;
 
         let actionsHtml = '';
-        if (showActions && isOpen) {
+        if (isOpen) {
             actionsHtml = `
                 <div class="shift-card__actions">
                     <button class="btn btn--success btn--sm" onclick="takeShift(${s.id})"
@@ -618,15 +891,14 @@ function updateStats() {
 /** Refresh tất cả data */
 function refreshAll() {
     loadAllShifts();
-    loadOpenShifts();
-    if (currentEmployeeId) loadMySchedule();
+    refreshCurrentPage();
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
 
-/** Format thời gian */
+/** Format thời gian range */
 function formatTimeRange(start, end) {
     try {
         const s = new Date(start);
@@ -638,6 +910,16 @@ function formatTimeRange(start, end) {
         return `${dateStr} · ${startStr} → ${endStr} (${hours}h)`;
     } catch {
         return `${start} → ${end}`;
+    }
+}
+
+/** Format time only (HH:MM) */
+function formatTime(dateStr) {
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return dateStr;
     }
 }
 

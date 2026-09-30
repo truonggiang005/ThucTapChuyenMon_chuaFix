@@ -213,6 +213,7 @@ cd ai-service
 
 # (Khuyến nghị) Tạo virtual environment
 python -m venv venv
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # Kích hoạt virtual environment
 # Windows CMD:

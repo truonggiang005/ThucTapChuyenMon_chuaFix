@@ -119,9 +119,9 @@ public class ShiftService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca #" + shiftId));
 
         // Kiểm tra trạng thái
-        if (shift.getStatus() != ShiftStatus.ASSIGNED) {
+        if (shift.getStatus() != ShiftStatus.ASSIGNED && shift.getStatus() != ShiftStatus.TAKEN) {
             throw new IllegalStateException(
-                    "Chỉ có thể nhả ca đang ở trạng thái ASSIGNED. Trạng thái hiện tại: " + shift.getStatus());
+                    "Chỉ có thể nhả ca đang ở trạng thái ASSIGNED hoặc TAKEN. Trạng thái hiện tại: " + shift.getStatus());
         }
 
         // Kiểm tra quyền: chỉ người được gán mới nhả được
@@ -170,15 +170,17 @@ public class ShiftService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên #" + employeeId));
 
         // Kiểm tra trùng lịch ca
-        boolean hasConflict = shiftRepository.hasScheduleConflict(
+        Long conflictCount = shiftRepository.countScheduleConflict(
                 employeeId, shift.getStartTime(), shift.getEndTime());
+        boolean hasConflict = conflictCount != null && conflictCount > 0;
         if (hasConflict) {
             throw new IllegalStateException("Bạn đã có ca trùng lịch trong khung giờ này");
         }
 
         // ★ Kiểm tra lịch bận
-        boolean isBusy = busyScheduleRepository.hasBusyConflict(
+        Long busyCount = busyScheduleRepository.countBusyConflict(
                 employeeId, shift.getStartTime(), shift.getEndTime());
+        boolean isBusy = busyCount != null && busyCount > 0;
         if (isBusy) {
             throw new IllegalStateException("Bạn đã đăng ký lịch bận trong khung giờ này. Hãy xóa lịch bận trước khi nhận ca.");
         }

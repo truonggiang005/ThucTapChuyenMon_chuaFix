@@ -57,8 +57,9 @@ public class BusyScheduleService {
         }
 
         // Kiểm tra trùng lịch bận đã đăng ký trước đó
-        boolean hasBusyConflict = busyScheduleRepository.hasBusyConflict(
+        Long busyCount = busyScheduleRepository.countBusyConflict(
                 request.getEmployeeId(), startTime, endTime);
+        boolean hasBusyConflict = busyCount != null && busyCount > 0;
         if (hasBusyConflict) {
             throw new IllegalStateException("Bạn đã có lịch bận trùng trong khoảng thời gian này");
         }
@@ -115,7 +116,8 @@ public class BusyScheduleService {
      */
     @Transactional(readOnly = true)
     public boolean isBusy(Long employeeId, LocalDateTime start, LocalDateTime end) {
-        return busyScheduleRepository.hasBusyConflict(employeeId, start, end);
+        Long count = busyScheduleRepository.countBusyConflict(employeeId, start, end);
+        return count != null && count > 0;
     }
 
     /**

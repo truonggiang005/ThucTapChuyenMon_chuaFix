@@ -116,20 +116,21 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     /**
      * Kiểm tra nhân viên có bị trùng lịch không (dùng khi nhận ca thủ công - Module 1).
-     * Trả về true nếu có ít nhất 1 ca overlap.
+     * Trả về số lượng ca overlap. Caller cần check > 0.
      *
      * Overlap condition: existingStart < newEnd AND existingEnd > newStart
      * Sử dụng Native Query để tránh lỗi JPQL enum parsing.
+     * Trả về Long thay vì boolean vì MySQL native query trả Long cho CASE WHEN.
      */
     @Query(value =
-            "SELECT CASE WHEN COUNT(*) > 0 THEN true ELSE false END " +
+            "SELECT COUNT(*) " +
             "FROM shifts s " +
             "WHERE s.assigned_to = :employeeId " +
             "AND s.status IN ('ASSIGNED', 'TAKEN', 'FORCE_ASSIGNED') " +
             "AND s.start_time < :newEnd " +
             "AND s.end_time > :newStart",
             nativeQuery = true)
-    boolean hasScheduleConflict(
+    Long countScheduleConflict(
             @Param("employeeId") Long employeeId,
             @Param("newStart") LocalDateTime newStart,
             @Param("newEnd") LocalDateTime newEnd
