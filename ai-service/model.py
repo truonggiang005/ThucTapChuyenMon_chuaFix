@@ -29,10 +29,12 @@ from schemas import EmployeeData, ShiftData, EmployeeScore
 # ============================================================
 # TRỌNG SỐ CÁC TIÊU CHÍ (tổng = 1.0)
 # ============================================================
-WEIGHT_RELIABILITY = 0.35   # Độ tin cậy (lịch sử làm việc)
+WEIGHT_RELIABILITY = 0.30   # Độ tin cậy (lịch sử làm việc)
 WEIGHT_SKILL_FIT = 0.25     # Mức kỹ năng phù hợp
-WEIGHT_TIME_FIT = 0.20      # Khung giờ ưa thích
-WEIGHT_WORKLOAD_FIT = 0.20  # Khối lượng công việc còn lại
+WEIGHT_TIME_FIT = 0.15      # Khung giờ ưa thích
+WEIGHT_WORKLOAD_FIT = 0.15  # Khối lượng công việc còn lại
+WEIGHT_LOCATION_FIT = 0.15  # Phù hợp chi nhánh (Location Fit)
+
 
 
 # ============================================================
@@ -183,6 +185,20 @@ def _calc_workload_fit_score(emp: EmployeeData, shift_duration_hours: float) -> 
     return capacity_ratio * 100.0
 
 
+def _calc_location_fit_score(emp: EmployeeData, shift_branch_id: int) -> float:
+    """
+    ★ Tiêu chí 5: Phù hợp chi nhánh (0-100 điểm)
+
+    Logic:
+      - Nếu chi nhánh chính của nhân viên trùng với chi nhánh của ca làm việc → 100 điểm
+      - Nếu khác chi nhánh → 40 điểm (có thể làm được nhưng mất công di chuyển)
+    """
+    if emp.branch_id == shift_branch_id:
+        return 100.0
+    return 40.0
+
+
+
 def calculate_match_scores(
     shift: ShiftData,
     candidates: List[EmployeeData]
@@ -207,18 +223,20 @@ def calculate_match_scores(
     results: List[EmployeeScore] = []
 
     for emp in candidates:
-        # Tính 4 tiêu chí con
+        # Tính 5 tiêu chí con
         reliability = _calc_reliability_score(emp)
         skill_fit = _calc_skill_fit_score(emp, shift.required_level)
         time_fit = _calc_time_fit_score(emp, shift_time_slot)
         workload_fit = _calc_workload_fit_score(emp, shift.shift_duration_hours)
+        location_fit = _calc_location_fit_score(emp, shift.branch_id)
 
         # Tổng hợp điểm theo trọng số
         match_score = (
             WEIGHT_RELIABILITY * reliability +
             WEIGHT_SKILL_FIT * skill_fit +
             WEIGHT_TIME_FIT * time_fit +
-            WEIGHT_WORKLOAD_FIT * workload_fit
+            WEIGHT_WORKLOAD_FIT * workload_fit +
+            WEIGHT_LOCATION_FIT * location_fit
         )
 
         # Làm tròn 2 chữ số thập phân
@@ -230,11 +248,13 @@ def calculate_match_scores(
             "skill_fit": round(skill_fit, 2),
             "time_fit": round(time_fit, 2),
             "workload_fit": round(workload_fit, 2),
+            "location_fit": round(location_fit, 2),
             "weights": {
                 "reliability": WEIGHT_RELIABILITY,
                 "skill_fit": WEIGHT_SKILL_FIT,
                 "time_fit": WEIGHT_TIME_FIT,
                 "workload_fit": WEIGHT_WORKLOAD_FIT,
+                "location_fit": WEIGHT_LOCATION_FIT,
             }
         }
 

@@ -1,7 +1,10 @@
 package com.smartschedule.controller;
 
 import com.smartschedule.dto.AIMatchResponse;
+import com.smartschedule.dto.CreateShiftRequest;
 import com.smartschedule.dto.ShiftDTO;
+import com.smartschedule.entity.Branch;
+import com.smartschedule.entity.Skill;
 import com.smartschedule.service.ShiftService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +23,11 @@ import java.util.Map;
  *   GET  /api/shifts/open?branchId=1          → Ca mở theo chi nhánh
  *   GET  /api/shifts/employee/{id}            → Lịch làm của NV
  *   GET  /api/shifts/{id}/candidates          → AI Matchmaking (Module 2)
+ *   POST /api/shifts                          → Tạo ca mới
  *   POST /api/shifts/{id}/release?employeeId= → Nhả ca (Module 1)
  *   POST /api/shifts/{id}/take?employeeId=    → Nhận ca (Module 1 + Tương tranh)
+ *   GET  /api/shifts/branches                 → Danh sách chi nhánh
+ *   GET  /api/shifts/skills                   → Danh sách kỹ năng
  */
 @RestController
 @RequestMapping("/api/shifts")
@@ -57,6 +63,23 @@ public class ShiftController {
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<ShiftDTO>> getEmployeeSchedule(@PathVariable Long employeeId) {
         return ResponseEntity.ok(shiftService.getEmployeeSchedule(employeeId));
+    }
+
+    /**
+     * ★ TẠO CA MỚI.
+     *
+     * Ví dụ: POST /api/shifts
+     * Body: { title, startTime, endTime, requiredLevel, branchId, requiredSkillId, assignedToId }
+     */
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createShift(@RequestBody CreateShiftRequest request) {
+        log.info("[CONTROLLER] POST /api/shifts | title={}", request.getTitle());
+
+        ShiftDTO result = shiftService.createShift(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Tạo ca thành công!",
+                "shift", result
+        ));
     }
 
     /**
@@ -114,4 +137,29 @@ public class ShiftController {
         AIMatchResponse response = shiftService.getMatchingCandidates(shiftId);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Lấy danh sách chi nhánh (dùng cho form tạo ca).
+     */
+    @GetMapping("/branches")
+    public ResponseEntity<List<Map<String, Object>>> getBranches() {
+        List<Branch> branches = shiftService.getAllBranches();
+        List<Map<String, Object>> result = branches.stream()
+                .map(b -> Map.<String, Object>of("id", b.getId(), "name", b.getName()))
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Lấy danh sách kỹ năng (dùng cho form tạo ca).
+     */
+    @GetMapping("/skills")
+    public ResponseEntity<List<Map<String, Object>>> getSkills() {
+        List<Skill> skills = shiftService.getAllSkills();
+        List<Map<String, Object>> result = skills.stream()
+                .map(s -> Map.<String, Object>of("id", s.getId(), "name", s.getName()))
+                .toList();
+        return ResponseEntity.ok(result);
+    }
 }
+

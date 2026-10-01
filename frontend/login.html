@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - FlexiShift AI</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-color: #f8fafc;
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --error-color: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .login-box {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-title {
+            margin-top: 0;
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: var(--text-color);
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .error-msg {
+            color: var(--error-color);
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .hint {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #64748b;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-box">
+    <h1 class="login-title">FlexiShift AI</h1>
+    <form id="loginForm">
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="email" class="form-input" required placeholder="Nhập email của bạn">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Mật khẩu</label>
+            <input type="password" id="password" class="form-input" required placeholder="Nhập mật khẩu (123456)">
+        </div>
+        <button type="submit" class="btn-submit">Đăng Nhập</button>
+        <div id="errorMsg" class="error-msg">Email hoặc mật khẩu không đúng!</div>
+    </form>
+
+    <div class="hint">
+        <b>Tài khoản Admin:</b> an@smartschedule.com (Pass: 123456)<br>
+        <b>Tài khoản Nhân viên:</b> binh@smartschedule.com, cuong@smartschedule.com, ... (Pass: 123456)
+    </div>
+</div>
+
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const errorMsg = document.getElementById('errorMsg');
+
+        // Hardcode password check for mockup
+        if (password !== '123456') {
+            errorMsg.style.display = 'block';
+            errorMsg.textContent = 'Mật khẩu sai! (Mật khẩu mặc định là 123456)';
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:8080/api/employees');
+            if (!res.ok) throw new Error('Không thể kết nối đến server');
+            const employees = await res.json();
+            
+            const user = employees.find(emp => emp.email === email);
+            if (!user) {
+                errorMsg.style.display = 'block';
+                errorMsg.textContent = 'Không tìm thấy tài khoản với email này!';
+                return;
+            }
+
+            // Gán role: An (id = 1) là ADMIN, còn lại là EMPLOYEE
+            if (user.id === 1) {
+                user.role = 'ADMIN';
+            } else {
+                user.role = 'EMPLOYEE';
+            }
+
+            localStorage.setItem('flexishift_user', JSON.stringify(user));
+            window.location.href = 'index.html';
+
+        } catch (err) {
+            errorMsg.style.display = 'block';
+            errorMsg.textContent = err.message;
+        }
+    });
+</script>
+
+</body>
+</html>

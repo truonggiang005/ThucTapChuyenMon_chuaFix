@@ -6,6 +6,7 @@ Spring Boot gửi danh sách nhân viên đủ điều kiện (đã lọc sơ b�
 Python trả về danh sách đã chấm điểm Match Score.
 """
 
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -28,6 +29,7 @@ class EmployeeData(BaseModel):
     preferred_time: str = Field("MORNING", description="Khung giờ ưa thích: MORNING|AFTERNOON|EVENING|NIGHT")
     hours_worked_this_week: float = Field(0.0, ge=0, description="Số giờ đã làm trong tuần hiện tại")
     max_hours_per_week: int = Field(40, description="Giới hạn giờ làm/tuần")
+    branch_id: int = Field(0, description="ID chi nhánh chính của nhân viên")
 
 
 class ShiftData(BaseModel):

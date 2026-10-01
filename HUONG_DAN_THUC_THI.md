@@ -213,14 +213,13 @@ cd ai-service
 
 # (Khuyến nghị) Tạo virtual environment
 python -m venv venv
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # Kích hoạt virtual environment
 # Windows CMD:
 venv\Scripts\activate
 # Windows PowerShell:
 venv\Scripts\Activate.ps1
-# Linux/macOS:
-source venv/bin/activate
 
 # Cài đặt dependencies
 pip install -r requirements.txt
@@ -231,7 +230,7 @@ pip install -r requirements.txt
 ```bash
 # Cách 1: Chạy trực tiếp
 python main.py
-
+\ 0
 # Cách 2: Chạy bằng uvicorn (có hot-reload)
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -273,25 +272,17 @@ ai.service.url=http://localhost:8001
 cd backend
 
 # Build project (lần đầu sẽ tải dependencies, có thể mất 3-5 phút)
-# Windows:
 .\mvnw.cmd clean install -DskipTests
-# Linux/macOS:
-./mvnw clean install -DskipTests
-```
-
 > ⚠️ Nếu không có file `mvnw` (Maven Wrapper), dùng Maven global: `mvn clean install -DskipTests`
-
 
 ### 6.3. Chạy Spring Boot
 
 ```bash
 # Windows:
 .\mvnw.cmd spring-boot:run
-# Linux/macOS:
-./mvnw spring-boot:run
 
-# Hoặc dùng Maven global:
-mvn spring-boot:run
+
+
 ```
 
 ### 6.4. Kiểm tra Backend

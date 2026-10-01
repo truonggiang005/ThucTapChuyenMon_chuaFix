@@ -106,6 +106,7 @@ public class AIService {
                         .preferred_time(emp.getPreferredTime())
                         .hours_worked_this_week(hoursWorked != null ? hoursWorked : 0.0)
                         .max_hours_per_week(emp.getMaxHoursPerWeek())
+                        .branch_id(emp.getPrimaryBranch() != null ? emp.getPrimaryBranch().getId() : 0L)
                         .build();
             }).collect(Collectors.toList());
 
