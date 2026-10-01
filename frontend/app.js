@@ -17,6 +17,7 @@ const AI_HEALTH_URL = 'http://localhost:8000/api/v1/health';
 
 // State
 let currentEmployeeId = null;
+let currentUserRole = null;
 let allShifts = [];
 let employees = [];
 let branches = [];
@@ -30,21 +31,45 @@ const DAY_NAMES_VI = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6
 // KHỞI TẠO
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Kiểm tra đăng nhập
+    const userStr = localStorage.getItem('flexishift_user');
+    if (!userStr) {
+        window.location.href = 'login.html';
+        return;
+    }
+    
+    const user = JSON.parse(userStr);
+    currentEmployeeId = user.id;
+    currentUserRole = user.role; // 'ADMIN' or 'EMPLOYEE'
+
+    // Áp dụng RBAC
+    if (currentUserRole === 'EMPLOYEE') {
+        // Nhân viên không được thấy tab Quản Lý
+        const navAdmin = document.getElementById('navAdmin');
+        if (navAdmin) navAdmin.style.display = 'none';
+    }
+
+    // Hiển thị user info
+    document.getElementById('userName').textContent = user.fullName;
+    document.getElementById('userRoleStr').textContent = '(' + (currentUserRole === 'ADMIN' ? 'Quản lý' : 'Nhân viên') + ')';
+    if (document.getElementById('busyEmployeeNameDisplay')) {
+        document.getElementById('busyEmployeeNameDisplay').textContent = user.fullName;
+    }
+
+    // Logout
+    document.getElementById('btnLogout').addEventListener('click', () => {
+        localStorage.removeItem('flexishift_user');
+        window.location.href = 'login.html';
+    });
+
     initNavigation();
-    loadEmployees();
+    loadEmployees(); // Must load for Create Shift dropdown
     loadAllShifts();
     loadFilterOptions();
     checkAIHealth();
 
     // Kiểm tra AI health mỗi 30 giây
     setInterval(checkAIHealth, 30000);
-
-    // Listener chọn nhân viên
-    document.getElementById('currentUser').addEventListener('change', (e) => {
-        currentEmployeeId = e.target.value ? parseInt(e.target.value) : null;
-        updateUserDisplay();
-        refreshCurrentPage();
-    });
 
     // Form listeners
     document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
@@ -95,15 +120,7 @@ function refreshCurrentPage() {
 }
 
 function updateUserDisplay() {
-    const nameEl = document.getElementById('userName');
-    if (currentEmployeeId) {
-        const emp = employees.find(e => e.id === currentEmployeeId);
-        if (emp) {
-            nameEl.textContent = emp.fullName;
-        }
-    } else {
-        nameEl.textContent = '—';
-    }
+    // Không cần nữa vì đã có login
 }
 
 // ============================================================
@@ -143,23 +160,12 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-/** Tải danh sách nhân viên → populate dropdown */
+/** Tải danh sách nhân viên */
 async function loadEmployees() {
     try {
         employees = await apiFetch(`${API_BASE}/employees`);
-        const select = document.getElementById('currentUser');
-
-        // Xóa options cũ (trừ placeholder)
-        while (select.options.length > 1) select.remove(1);
-
-        employees.forEach(emp => {
-            const opt = document.createElement('option');
-            opt.value = emp.id;
-            opt.textContent = `${emp.fullName} (${emp.email})`;
-            select.appendChild(opt);
-        });
     } catch (err) {
-        showToast('Lỗi tải danh sách nhân viên: ' + err.message, 'error');
+        console.error('Lỗi tải danh sách nhân viên:', err);
     }
 }
 
@@ -439,8 +445,8 @@ function renderMarketGrid(container, shifts, aiScores = {}) {
                 <div class="market-card__requirement">
                     Yêu cầu: ${s.requiredSkillName || 'Không yêu cầu'} | Mức ${s.requiredLevel}
                 </div>
-                <div class="market-card__action">
-                    <button class="btn-take" onclick="takeShift(${s.id})"
+                <div class="market-card__action" style="margin-top: 15px;">
+                    <button class="btn-take" style="width: 100%;" onclick="takeShift(${s.id})"
                         ${!currentEmployeeId ? 'disabled title="Chọn nhân viên trước"' : ''}>
                         Đăng ký nhận ca
                     </button>
@@ -739,8 +745,9 @@ async function showCandidates(shiftId) {
                         <div class="candidate-row__details">
                             Tin cậy: ${breakdown.reliability ?? '—'}% ·
                             Kỹ năng: ${breakdown.skill_fit ?? '—'}% ·
-                            Giờ phù hợp: ${breakdown.time_fit ?? '—'}% ·
-                            Khối lượng: ${breakdown.workload_fit ?? '—'}%
+                            Giờ: ${breakdown.time_fit ?? '—'}% ·
+                            Khối lượng: ${breakdown.workload_fit ?? '—'}% ·
+                            Chi nhánh: ${breakdown.location_fit ?? '—'}%
                         </div>
                     </div>
                     <div class="candidate-row__score">

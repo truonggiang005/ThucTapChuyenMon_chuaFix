@@ -109,22 +109,24 @@ public class DataSeeder implements CommandLineRunner {
 
         // ── 4. Employee-Skill (N-N) ──
         List<EmployeeSkill> skills = List.of(
-                // An: Barista L4, Cashier L3
+                // An: Barista L4, Cashier L3, Kitchen L5
                 EmployeeSkill.builder().employee(emp1).skill(barista).skillLevel(4).build(),
                 EmployeeSkill.builder().employee(emp1).skill(cashier).skillLevel(3).build(),
-                // Bình: Cashier L5, Kitchen L2
+                EmployeeSkill.builder().employee(emp1).skill(kitchen).skillLevel(5).build(),
+                // Bình: Cashier L5, Kitchen L5
                 EmployeeSkill.builder().employee(emp2).skill(cashier).skillLevel(5).build(),
-                EmployeeSkill.builder().employee(emp2).skill(kitchen).skillLevel(2).build(),
-                // Cường: Kitchen L4, Barista L2
-                EmployeeSkill.builder().employee(emp3).skill(kitchen).skillLevel(4).build(),
+                EmployeeSkill.builder().employee(emp2).skill(kitchen).skillLevel(5).build(),
+                // Cường: Kitchen L5, Barista L2
+                EmployeeSkill.builder().employee(emp3).skill(kitchen).skillLevel(5).build(),
                 EmployeeSkill.builder().employee(emp3).skill(barista).skillLevel(2).build(),
-                // Đức: Barista L5, Cashier L4, Kitchen L3
+                // Đức: Barista L5, Cashier L4, Kitchen L5
                 EmployeeSkill.builder().employee(emp4).skill(barista).skillLevel(5).build(),
                 EmployeeSkill.builder().employee(emp4).skill(cashier).skillLevel(4).build(),
-                EmployeeSkill.builder().employee(emp4).skill(kitchen).skillLevel(3).build(),
-                // Ema: Cashier L3, Barista L1
+                EmployeeSkill.builder().employee(emp4).skill(kitchen).skillLevel(5).build(),
+                // Ema: Cashier L3, Barista L1, Kitchen L5
                 EmployeeSkill.builder().employee(emp5).skill(cashier).skillLevel(3).build(),
-                EmployeeSkill.builder().employee(emp5).skill(barista).skillLevel(1).build()
+                EmployeeSkill.builder().employee(emp5).skill(barista).skillLevel(1).build(),
+                EmployeeSkill.builder().employee(emp5).skill(kitchen).skillLevel(5).build()
         );
         employeeSkillRepository.saveAll(skills);
 

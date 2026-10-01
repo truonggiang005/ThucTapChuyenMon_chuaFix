@@ -25,14 +25,12 @@
             <span id="aiStatusText">AI</span>
         </div>
     </div>
-    <div class="header__right">
-        <select class="header__user-select" id="currentUser">
-            <option value="">Chọn nhân viên...</option>
-        </select>
+    <div class="header__right" style="display: flex; align-items: center; gap: 15px;">
         <div class="header__user-info" id="userInfoDisplay">
             <span class="header__user-name" id="userName">—</span>
-            <span class="header__user-role">(Nhân viên)</span>
+            <span class="header__user-role" id="userRoleStr">(Nhân viên)</span>
         </div>
+        <button id="btnLogout" class="btn btn--outline btn--sm" style="border-color: #ef4444; color: #ef4444;">Đăng Xuất</button>
     </div>
 </header>
 
@@ -63,6 +61,10 @@
                 <div class="registration-panel">
                     <h2 class="registration-panel__title">Bảng Đăng Ký Lịch Bận & Báo Nghỉ <span class="registration-panel__subtitle">(Unavailability Registration Panel)</span></h2>
                     
+                    <p style="margin-top: -10px; margin-bottom: 15px; font-weight: bold; color: var(--accent-orange); font-size: 0.95rem;">
+                        👤 Đang đăng ký cho nhân viên: <span id="busyEmployeeNameDisplay">Chưa chọn</span>
+                    </p>
+
                     <form id="busyScheduleForm" class="busy-form">
                         <div class="busy-form__row">
                             <div class="busy-form__group">
@@ -130,8 +132,6 @@
             </div>
         </div>
 
-        <!-- AI Candidates Panel -->
-        <div id="candidatesPanel"></div>
     </section>
 
     <!-- ============ PAGE 3: Tài Khoản ============ -->
@@ -235,6 +235,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- AI Candidates Panel (Moved from Market) -->
+        <div id="candidatesPanel"></div>
     </section>
 
 </main>

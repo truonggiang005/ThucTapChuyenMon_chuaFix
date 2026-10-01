@@ -20,4 +20,5 @@ public class AIEmployeeData {
     private String preferred_time;
     private Double hours_worked_this_week;
     private Integer max_hours_per_week;
+    private Long branch_id;
 }
