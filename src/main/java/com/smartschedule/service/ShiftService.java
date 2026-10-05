@@ -98,6 +98,65 @@ public class ShiftService {
         return convertToDTO(saved);
     }
 
+    /**
+     * Cập nhật ca làm việc.
+     *
+     * @param id ID của ca cần cập nhật
+     * @param request Thông tin ca cần cập nhật
+     * @return ShiftDTO sau khi cập nhật
+     */
+    @Transactional
+    public ShiftDTO updateShift(Long id, CreateShiftRequest request) {
+        log.info("[SHIFT] Cập nhật ca #{}: {}", id, request.getTitle());
+
+        Shift shift = shiftRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca #" + id));
+
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chi nhánh #" + request.getBranchId()));
+
+        Skill skill = null;
+        if (request.getRequiredSkillId() != null) {
+            skill = skillRepository.findById(request.getRequiredSkillId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy kỹ năng #" + request.getRequiredSkillId()));
+        }
+
+        LocalDateTime startTime = LocalDateTime.parse(request.getStartTime());
+        LocalDateTime endTime = LocalDateTime.parse(request.getEndTime());
+
+        if (endTime.isBefore(startTime) || endTime.isEqual(startTime)) {
+            throw new IllegalStateException("Thời gian kết thúc phải sau thời gian bắt đầu");
+        }
+
+        Employee assignedTo = null;
+        ShiftStatus status = shift.getStatus();
+
+        if (request.getAssignedToId() != null) {
+            assignedTo = employeeRepository.findById(request.getAssignedToId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên #" + request.getAssignedToId()));
+            if (status == ShiftStatus.OPEN || status == ShiftStatus.UNFILLED) {
+                status = ShiftStatus.ASSIGNED;
+            }
+        } else {
+            if (status == ShiftStatus.ASSIGNED || status == ShiftStatus.TAKEN || status == ShiftStatus.FORCE_ASSIGNED) {
+                status = ShiftStatus.OPEN;
+            }
+        }
+
+        shift.setTitle(request.getTitle());
+        shift.setStartTime(startTime);
+        shift.setEndTime(endTime);
+        shift.setRequiredLevel(request.getRequiredLevel() != null ? request.getRequiredLevel() : 1);
+        shift.setBranch(branch);
+        shift.setRequiredSkill(skill);
+        shift.setAssignedTo(assignedTo);
+        shift.setStatus(status);
+
+        Shift saved = shiftRepository.save(shift);
+        log.info("[SHIFT] ✅ Đã cập nhật ca #{} ({})", saved.getId(), status);
+        return convertToDTO(saved);
+    }
+
     // ============================================================
     // MODULE 1: ĐỔI CA & TƯƠNG TRANH
     // ============================================================
@@ -197,11 +256,7 @@ public class ShiftService {
                 employeeId, weekStart, weekEnd);
         double shiftHours = Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes() / 60.0;
 
-        if ((hoursWorked != null ? hoursWorked : 0) + shiftHours > employee.getMaxHoursPerWeek()) {
-            throw new IllegalStateException(
-                    String.format("Vượt quá giới hạn giờ/tuần. Đã làm: %.1fh + Ca mới: %.1fh > Tối đa: %dh",
-                            hoursWorked, shiftHours, employee.getMaxHoursPerWeek()));
-        }
+
 
         // ★ GÁN CA (Optimistic Locking tự động kiểm tra @Version)
         try {

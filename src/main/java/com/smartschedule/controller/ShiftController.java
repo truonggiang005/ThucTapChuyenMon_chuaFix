@@ -83,6 +83,22 @@ public class ShiftController {
     }
 
     /**
+     * Cập nhật ca.
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateShift(
+            @PathVariable Long id,
+            @RequestBody CreateShiftRequest request) {
+        log.info("[CONTROLLER] PUT /api/shifts/{} | title={}", id, request.getTitle());
+
+        ShiftDTO result = shiftService.updateShift(id, request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Cập nhật ca thành công!",
+                "shift", result
+        ));
+    }
+
+    /**
      * ★ MODULE 1: Nhả ca (ASSIGNED → OPEN).
      *
      * Ví dụ: POST /api/shifts/1/release?employeeId=1

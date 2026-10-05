@@ -1,12 +1,18 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="FlexiShift AI - Hệ thống quản lý ca làm việc tích hợp AI chấm điểm và phân bổ nhân sự">
     <title>FlexiShift AI | Smart Shift Management</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/css/style.css" th:href="@{/css/style.css}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <script>
+        // Kiểm tra ngay lập tức trước khi tải giao diện
+        if (!localStorage.getItem('flexishift_user')) {
+            window.location.href = '/';
+        }
+    </script>
 </head>
 <body>
 
@@ -240,11 +246,65 @@
         <div id="candidatesPanel"></div>
     </section>
 
+    <!-- Edit Shift Modal -->
+    <div id="editShiftModal" class="modal" style="display: none; position: fixed; top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div class="admin-form-container" style="background:#fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; margin: auto; top: 5%;">
+            <button type="button" onclick="document.getElementById('editShiftModal').style.display='none'" style="position: absolute; right: 15px; top: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #555;">&times;</button>
+            <h2 class="admin-form__title">Chỉnh sửa Ca Làm Việc</h2>
+            <form id="editShiftForm" class="admin-form">
+                <input type="hidden" id="editShiftId">
+                <div class="admin-form__group">
+                    <label class="form-label">Tiêu đề ca</label>
+                    <input type="text" id="editShiftTitle" required class="form-input">
+                </div>
+
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Thời gian bắt đầu</label>
+                        <input type="datetime-local" id="editShiftStartTime" required class="form-input">
+                    </div>
+                    <div class="admin-form__group">
+                        <label class="form-label">Thời gian kết thúc</label>
+                        <input type="datetime-local" id="editShiftEndTime" required class="form-input">
+                    </div>
+                </div>
+
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Chi nhánh</label>
+                        <select id="editShiftBranch" required class="form-input"></select>
+                    </div>
+                    <div class="admin-form__group">
+                        <label class="form-label">Kỹ năng yêu cầu</label>
+                        <select id="editShiftSkill" class="form-input">
+                            <option value="">Không yêu cầu</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label">Level kỹ năng</label>
+                        <input type="number" id="editShiftLevel" min="1" max="5" required class="form-input">
+                    </div>
+                    <div class="admin-form__group">
+                        <label class="form-label">Gán trước cho NV</label>
+                        <select id="editShiftEmployee" class="form-input">
+                            <option value="">Để trống (Trạng thái OPEN)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn--primary btn--full">Lưu Thay Đổi</button>
+            </form>
+        </div>
+    </div>
+
 </main>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="app.js"></script>
+<script src="/js/app.js" th:src="@{/js/app.js}"></script>
 </body>
 </html>

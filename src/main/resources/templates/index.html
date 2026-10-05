@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -142,8 +142,11 @@
         }
 
         try {
-            const res = await fetch('http://localhost:8080/api/employees');
-            if (!res.ok) throw new Error('Không thể kết nối đến server');
+            const apiBase = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && window.location.port === '8080'
+                ? '/api'
+                : 'http://localhost:8080/api';
+            const res = await fetch(`${apiBase}/employees`);
+            if (!res.ok) throw new Error('Không thể kết nối đến server Spring Boot (port 8080)');
             const employees = await res.json();
             
             const user = employees.find(emp => emp.email === email);
@@ -161,7 +164,10 @@
             }
 
             localStorage.setItem('flexishift_user', JSON.stringify(user));
-            window.location.href = 'index.html';
+            const dashboardUrl = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && window.location.port === '8080'
+                ? '/dashboard'
+                : 'http://localhost:8080/dashboard';
+            window.location.href = dashboardUrl;
 
         } catch (err) {
             errorMsg.style.display = 'block';

@@ -66,7 +66,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Nguyễn Văn An")
                 .email("an@smartschedule.com")
                 .passwordHash("$2a$10$hash1") // BCrypt placeholder
-                .maxHoursPerWeek(40)
+                .maxHoursPerWeek(20)
                 .totalCompleted(50).totalCancelled(2).lateArrivalCount(1)
                 .preferredTime("MORNING")
                 .primaryBranch(hcm).build());
@@ -75,7 +75,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Trần Thị Bình")
                 .email("binh@smartschedule.com")
                 .passwordHash("$2a$10$hash2")
-                .maxHoursPerWeek(40)
+                .maxHoursPerWeek(15)
                 .totalCompleted(35).totalCancelled(5).lateArrivalCount(3)
                 .preferredTime("AFTERNOON")
                 .primaryBranch(hcm).build());
@@ -84,7 +84,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Lê Hoàng Cường")
                 .email("cuong@smartschedule.com")
                 .passwordHash("$2a$10$hash3")
-                .maxHoursPerWeek(36)
+                .maxHoursPerWeek(29)
                 .totalCompleted(20).totalCancelled(8).lateArrivalCount(5)
                 .preferredTime("EVENING")
                 .primaryBranch(hcm).build());
@@ -93,7 +93,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Phạm Minh Đức")
                 .email("duc@smartschedule.com")
                 .passwordHash("$2a$10$hash4")
-                .maxHoursPerWeek(40)
+                .maxHoursPerWeek(34)
                 .totalCompleted(45).totalCancelled(1).lateArrivalCount(0)
                 .preferredTime("MORNING")
                 .primaryBranch(hn).build());
@@ -102,7 +102,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Hoàng Thị Ema")
                 .email("ema@smartschedule.com")
                 .passwordHash("$2a$10$hash5")
-                .maxHoursPerWeek(32)
+                .maxHoursPerWeek(17)
                 .totalCompleted(10).totalCancelled(0).lateArrivalCount(0)
                 .preferredTime("MORNING")
                 .primaryBranch(hn).build());

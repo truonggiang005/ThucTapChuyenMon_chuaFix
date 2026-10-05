@@ -1,7 +1,7 @@
 /**
  * FlexiShift AI - Frontend Application (Redesigned)
  *
- * Giao tiếp với Spring Boot REST API (http://localhost:8080/api/...)
+ * Giao tiếp với Spring Boot REST API (/api/... - cùng origin với giao diện)
  * Pages:
  *   1. Lịch Cá Nhân Tổng Hợp (Personal Schedule)
  *   2. Chợ Ca Trực (Shift Marketplace)
@@ -12,8 +12,10 @@
 // ============================================================
 // CẤU HÌNH
 // ============================================================
-const API_BASE = 'http://localhost:8080/api';
-const AI_HEALTH_URL = 'http://localhost:8000/api/v1/health';
+const isPort8080 = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && window.location.port === '8080';
+const API_BASE = isPort8080 ? '/api' : 'http://localhost:8080/api';
+const LOGIN_PAGE_URL = isPort8080 ? '/' : 'http://localhost:8080/';
+const AI_HEALTH_URL = 'http://localhost:8001/api/v1/health';
 
 // State
 let currentEmployeeId = null;
@@ -28,19 +30,21 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat'];
 const DAY_NAMES_VI = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
 // ============================================================
-// KHỞI TẠO
+// KHỞI TẠO VÀ KIỂM TRA ĐĂNG NHẬP (Chạy ngay lập tức)
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Kiểm tra đăng nhập
-    const userStr = localStorage.getItem('flexishift_user');
-    if (!userStr) {
-        window.location.href = 'login.html';
-        return;
-    }
-    
+const userStr = localStorage.getItem('flexishift_user');
+if (!userStr) {
+    window.location.href = LOGIN_PAGE_URL;
+} else {
     const user = JSON.parse(userStr);
     currentEmployeeId = user.id;
     currentUserRole = user.role; // 'ADMIN' or 'EMPLOYEE'
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!userStr) return; // Đang đợi redirect
+    
+    const user = JSON.parse(userStr);
 
     // Áp dụng RBAC
     if (currentUserRole === 'EMPLOYEE') {
@@ -59,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Logout
     document.getElementById('btnLogout').addEventListener('click', () => {
         localStorage.removeItem('flexishift_user');
-        window.location.href = 'login.html';
+        window.location.href = LOGIN_PAGE_URL;
     });
 
     initNavigation();
@@ -73,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Form listeners
     document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
+    document.getElementById('editShiftForm')?.addEventListener('submit', handleEditShift);
     document.getElementById('busyScheduleForm')?.addEventListener('submit', handleCreateBusySchedule);
 
     // Filter listeners
@@ -568,6 +573,66 @@ async function handleCreateShift(e) {
     }
 }
 
+/** Mở modal chỉnh sửa ca */
+function openEditShiftModal(shiftId) {
+    const shift = allShifts.find(s => s.id === shiftId);
+    if (!shift) return;
+
+    // Populate dropdowns first
+    const branchSelect = document.getElementById('editShiftBranch');
+    branchSelect.innerHTML = '<option value="">-- Chọn chi nhánh --</option>' +
+        branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+    const skillSelect = document.getElementById('editShiftSkill');
+    skillSelect.innerHTML = '<option value="">-- Không yêu cầu --</option>' +
+        skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+    const empSelect = document.getElementById('editShiftEmployee');
+    empSelect.innerHTML = '<option value="">-- Để trống (Trạng thái OPEN) --</option>' +
+        employees.map(e => `<option value="${e.id}">${e.fullName}</option>`).join('');
+
+    // Fill data
+    document.getElementById('editShiftId').value = shift.id;
+    document.getElementById('editShiftTitle').value = shift.title;
+    document.getElementById('editShiftStartTime').value = shift.startTime.substring(0, 16);
+    document.getElementById('editShiftEndTime').value = shift.endTime.substring(0, 16);
+    document.getElementById('editShiftBranch').value = shift.branchId || '';
+    document.getElementById('editShiftSkill').value = shift.requiredSkillId || '';
+    document.getElementById('editShiftLevel').value = shift.requiredLevel || 1;
+    document.getElementById('editShiftEmployee').value = shift.assignedToId || '';
+
+    document.getElementById('editShiftModal').style.display = 'flex';
+}
+
+/** Xử lý submit form sửa ca */
+async function handleEditShift(e) {
+    e.preventDefault();
+    const id = document.getElementById('editShiftId').value;
+    const request = {
+        title: document.getElementById('editShiftTitle').value,
+        startTime: document.getElementById('editShiftStartTime').value,
+        endTime: document.getElementById('editShiftEndTime').value,
+        branchId: parseInt(document.getElementById('editShiftBranch').value),
+        requiredSkillId: document.getElementById('editShiftSkill').value ? parseInt(document.getElementById('editShiftSkill').value) : null,
+        requiredLevel: parseInt(document.getElementById('editShiftLevel').value),
+        assignedToId: document.getElementById('editShiftEmployee').value ? parseInt(document.getElementById('editShiftEmployee').value) : null
+    };
+
+    try {
+        const result = await apiFetch(`${API_BASE}/shifts/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(request)
+        });
+
+        showToast('✅ ' + result.message, 'success');
+        document.getElementById('editShiftModal').style.display = 'none';
+        loadAllShifts();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+}
+
+
 // ============================================================
 // EMPLOYEE: LỊCH BẬN (BUSY SCHEDULE)
 // ============================================================
@@ -749,6 +814,9 @@ async function showCandidates(shiftId) {
                             Khối lượng: ${breakdown.workload_fit ?? '—'}% ·
                             Chi nhánh: ${breakdown.location_fit ?? '—'}%
                         </div>
+                        <div class="candidate-row__explanation" style="margin-top: 8px; font-size: 13px; color: var(--text-secondary); background: #f8fafc; padding: 6px 10px; border-radius: 4px; border-left: 3px solid var(--accent-blue);">
+                            💡 <strong>AI nhận xét:</strong> ${breakdown.explanation || 'Không có thông tin chi tiết.'}
+                        </div>
                     </div>
                     <div class="candidate-row__score">
                         <div class="candidate-row__score-value" style="color: var(--accent-${scoreClass === 'high' ? 'green' : scoreClass === 'mid' ? 'orange' : 'red'})">${c.match_score}%</div>
@@ -843,12 +911,25 @@ function renderAdminShiftsGrid(containerId, shifts) {
                     <button class="btn btn--primary btn--sm" onclick="showCandidates(${s.id})">
                         🤖 AI Gợi Ý
                     </button>
+                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
+                        ✏️ Sửa
+                    </button>
                 </div>`;
         } else if (isMyShift && s.status === 'ASSIGNED') {
             actionsHtml = `
                 <div class="shift-card__actions">
                     <button class="btn btn--danger btn--sm" onclick="releaseShift(${s.id})">
                         Nhả Ca
+                    </button>
+                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
+                        ✏️ Sửa
+                    </button>
+                </div>`;
+        } else {
+            actionsHtml = `
+                <div class="shift-card__actions">
+                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
+                        ✏️ Sửa
                     </button>
                 </div>`;
         }

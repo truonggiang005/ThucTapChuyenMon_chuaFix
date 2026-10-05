@@ -13,7 +13,15 @@ Chạy:
   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+# pyrefly: ignore [missing-import]
+import os
+# pyrefly: ignore [missing-import]
+from dotenv import load_dotenv
+# Đọc file .env nằm cùng thư mục với main.py (src/ai-service/) dù chạy từ thư mục nào
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ApiGeminiKey.env"))
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, HTTPException
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -141,11 +149,12 @@ def compute_match_score(request: MatchRequest):
 # ENTRY POINT
 # ============================================================
 if __name__ == "__main__":
+    # pyrefly: ignore [missing-import]
     import uvicorn
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=True,  # Auto-reload khi sửa code (chỉ dùng khi dev)
         log_level="info",
     )

@@ -4,7 +4,7 @@
 *.iml
 
 # Java / Maven
-backend/target/
+target/
 *.class
 *.jar
 *.war
@@ -12,8 +12,10 @@ backend/target/
 # Python
 __pycache__/
 *.pyc
-ai-service/venv/
-ai-service/env/
+src/ai-service/venv/
+src/ai-service/env/
+venv/
+.venv/
 .env
 
 # Frontend / Node
