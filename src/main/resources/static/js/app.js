@@ -25,6 +25,15 @@ let employees = [];
 let branches = [];
 let skills = [];
 
+// Notification system
+let notifications = JSON.parse(localStorage.getItem('flexishift_notifications') || '[]');
+
+// AI suggestion cache to prevent excessive API calls / token exhaustion
+const aiSuggestionCache = {};
+let aiCallCount = 0;
+const AI_CALL_LIMIT = 10; // Max AI calls per session
+let aiRateLimited = false;
+
 // Day name mapping
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat'];
 const DAY_NAMES_VI = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -44,45 +53,60 @@ if (!userStr) {
 document.addEventListener('DOMContentLoaded', () => {
     if (!userStr) return; // Đang đợi redirect
     
-    const user = JSON.parse(userStr);
+    try {
+        const user = JSON.parse(userStr);
 
-    // Áp dụng RBAC
-    if (currentUserRole === 'EMPLOYEE') {
-        // Nhân viên không được thấy tab Quản Lý
-        const navAdmin = document.getElementById('navAdmin');
-        if (navAdmin) navAdmin.style.display = 'none';
+        // Áp dụng RBAC
+        if (currentUserRole === 'EMPLOYEE') {
+            const navAdmin = document.getElementById('navAdmin');
+            if (navAdmin) navAdmin.style.display = 'none';
+        }
+
+        // Hiển thị user info
+        const userNameEl = document.getElementById('userName');
+        if (userNameEl) userNameEl.textContent = user.fullName || 'Người dùng';
+        const userRoleEl = document.getElementById('userRoleStr');
+        if (userRoleEl) userRoleEl.textContent = '(' + (currentUserRole === 'ADMIN' ? 'Quản lý' : 'Nhân viên') + ')';
+        const busyEmpEl = document.getElementById('busyEmployeeNameDisplay');
+        if (busyEmpEl) busyEmpEl.textContent = user.fullName || '';
+
+        // Hiển thị ngày tháng hiện tại
+        try {
+            updateCurrentDateDisplay();
+            setInterval(updateCurrentDateDisplay, 30000);
+        } catch(e) {}
+
+        // Notification system
+        try {
+            initNotificationSystem();
+        } catch(e) {}
+
+        // Logout
+        document.getElementById('btnLogout')?.addEventListener('click', () => {
+            localStorage.removeItem('flexishift_user');
+            window.location.href = LOGIN_PAGE_URL;
+        });
+
+        initNavigation();
+        loadEmployees(); // Must load for Create Shift dropdown
+        loadAllShifts();
+        loadFilterOptions();
+        checkAIHealth();
+
+        // Kiểm tra AI health mỗi 30 giây
+        setInterval(checkAIHealth, 30000);
+
+        // Form listeners
+        document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
+        document.getElementById('editShiftForm')?.addEventListener('submit', handleEditShift);
+        document.getElementById('busyScheduleForm')?.addEventListener('submit', handleCreateBusySchedule);
+
+        // Filter listeners
+        document.getElementById('filterBranch')?.addEventListener('change', loadMarketShifts);
+        document.getElementById('filterSkill')?.addEventListener('change', loadMarketShifts);
+    } catch (e) {
+        console.error('Lỗi khi khởi chạy ứng dụng:', e);
     }
-
-    // Hiển thị user info
-    document.getElementById('userName').textContent = user.fullName;
-    document.getElementById('userRoleStr').textContent = '(' + (currentUserRole === 'ADMIN' ? 'Quản lý' : 'Nhân viên') + ')';
-    if (document.getElementById('busyEmployeeNameDisplay')) {
-        document.getElementById('busyEmployeeNameDisplay').textContent = user.fullName;
-    }
-
-    // Logout
-    document.getElementById('btnLogout').addEventListener('click', () => {
-        localStorage.removeItem('flexishift_user');
-        window.location.href = LOGIN_PAGE_URL;
-    });
-
-    initNavigation();
-    loadEmployees(); // Must load for Create Shift dropdown
-    loadAllShifts();
-    loadFilterOptions();
-    checkAIHealth();
-
-    // Kiểm tra AI health mỗi 30 giây
-    setInterval(checkAIHealth, 30000);
-
-    // Form listeners
-    document.getElementById('createShiftForm')?.addEventListener('submit', handleCreateShift);
-    document.getElementById('editShiftForm')?.addEventListener('submit', handleEditShift);
-    document.getElementById('busyScheduleForm')?.addEventListener('submit', handleCreateBusySchedule);
-
-    // Filter listeners
-    document.getElementById('filterBranch')?.addEventListener('change', loadMarketShifts);
-    document.getElementById('filterSkill')?.addEventListener('change', loadMarketShifts);
 });
 
 // ============================================================
@@ -201,12 +225,23 @@ async function loadFilterOptions() {
 
 /** Tải tất cả ca → cập nhật stats + grid */
 async function loadAllShifts() {
+    const grid = document.getElementById('allShiftsGrid');
     try {
-        allShifts = await apiFetch(`${API_BASE}/shifts`);
+        const data = await apiFetch(`${API_BASE}/shifts`);
+        allShifts = Array.isArray(data) ? data : [];
         updateStats();
         renderAdminShiftsGrid('allShiftsGrid', allShifts);
     } catch (err) {
-        showToast('Lỗi tải danh sách ca: ' + err.message, 'error');
+        console.error('Lỗi tải danh sách ca:', err);
+        showToast('Lỗi tải danh sách ca: ' + (err.message || 'Không thể kết nối máy chủ'), 'error');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state__icon">⚠️</div>
+                    <div class="empty-state__text">Lỗi tải dữ liệu: ${err.message || 'Không thể kết nối máy chủ'}</div>
+                    <button class="btn btn--outline btn--sm" onclick="loadAllShifts()" style="margin-top: 10px;">🔄 Thử lại</button>
+                </div>`;
+        }
     }
 }
 
@@ -390,14 +425,21 @@ async function loadMarketShifts() {
             return;
         }
 
-        // If user is selected, try to get AI scores for all shifts
+        // If user is selected, try to get AI scores for all shifts with caching
         let aiScores = {};
         if (currentEmployeeId) {
-            // Get AI scores for each open shift (fire and forget errors)
+            // Get AI scores for each open shift with cache check to prevent token exhaustion
             const scorePromises = shifts.map(async (s) => {
                 try {
-                    const data = await apiFetch(`${API_BASE}/shifts/${s.id}/candidates`);
-                    if (data.ranked_candidates) {
+                    const cacheKey = `shift_${s.id}`;
+                    let data;
+                    if (aiSuggestionCache[cacheKey]) {
+                        data = aiSuggestionCache[cacheKey].data;
+                    } else {
+                        data = await apiFetch(`${API_BASE}/shifts/${s.id}/candidates`);
+                        aiSuggestionCache[cacheKey] = { data: data, timestamp: Date.now() };
+                    }
+                    if (data && data.ranked_candidates) {
                         const myScore = data.ranked_candidates.find(c => c.employee_id === currentEmployeeId);
                         if (myScore) {
                             aiScores[s.id] = myScore.match_score;
@@ -566,6 +608,13 @@ async function handleCreateShift(e) {
         });
 
         showToast('✅ ' + result.message, 'success');
+        
+        // Add notification if shift was assigned to someone
+        if (request.assignedToId) {
+            const emp = employees.find(e => e.id === request.assignedToId);
+            addNotification(`Đã gán ca "${request.title}" cho ${emp ? emp.fullName : 'NV #' + request.assignedToId}`, 'success');
+        }
+        
         e.target.reset();
         loadAllShifts();
     } catch (err) {
@@ -625,6 +674,11 @@ async function handleEditShift(e) {
         });
 
         showToast('✅ ' + result.message, 'success');
+        if (request.assignedToId) {
+            const emp = employees.find(e => e.id === request.assignedToId);
+            addNotification(`Admin đã gán ca "${request.title}" (#${id}) cho ${emp ? emp.fullName : 'NV #' + request.assignedToId}`, 'success');
+        }
+        delete aiSuggestionCache[`shift_${id}`];
         document.getElementById('editShiftModal').style.display = 'none';
         loadAllShifts();
     } catch (err) {
@@ -731,6 +785,9 @@ async function releaseShift(shiftId) {
             { method: 'POST' }
         );
         showToast(result.message, 'success');
+        const emp = employees.find(e => e.id === currentEmployeeId);
+        addNotification(`${emp ? emp.fullName : 'Nhân viên #' + currentEmployeeId} đã nhả ca #${shiftId}`, 'warning');
+        delete aiSuggestionCache[`shift_${shiftId}`];
         refreshAll();
     } catch (err) {
         showToast(err.message, 'error');
@@ -757,6 +814,9 @@ async function takeShift(shiftId) {
             { method: 'POST' }
         );
         showToast('✅ ' + (result.message || 'Đăng ký nhận ca thành công!'), 'success');
+        const emp = employees.find(e => e.id === currentEmployeeId);
+        addNotification(`${emp ? emp.fullName : 'Nhân viên #' + currentEmployeeId} đã nhận ca #${shiftId}`, 'info');
+        delete aiSuggestionCache[`shift_${shiftId}`];
         closeCandidatesPanel();
         refreshAll();
     } catch (err) {
@@ -867,6 +927,14 @@ async function takeShiftForCandidate(shiftId, employeeId) {
             { method: 'POST' }
         );
         showToast('✅ ' + result.message, 'success');
+        
+        // Add notification
+        const emp = employees.find(e => e.id === employeeId);
+        addNotification(`Admin đã gán ca #${shiftId} cho ${emp ? emp.fullName : 'NV #' + employeeId} qua AI gợi ý`, 'success');
+        
+        // Clear cache for this shift
+        delete aiSuggestionCache[`shift_${shiftId}`];
+        
         closeCandidatesPanel();
         refreshAll();
     } catch (err) {
@@ -886,6 +954,7 @@ function closeCandidatesPanel() {
 /** Render admin grid ca làm việc */
 function renderAdminShiftsGrid(containerId, shifts) {
     const container = document.getElementById(containerId);
+    if (!container) return;
 
     if (!shifts || shifts.length === 0) {
         container.innerHTML = `
@@ -896,84 +965,106 @@ function renderAdminShiftsGrid(containerId, shifts) {
         return;
     }
 
-    container.innerHTML = shifts.map(s => {
-        const isOpen = s.status === 'OPEN';
-        const isMyShift = s.assignedToId && s.assignedToId === currentEmployeeId;
+    try {
+        container.innerHTML = shifts.map(s => {
+            const isOpen = s.status === 'OPEN';
+            const isUnfilled = s.status === 'UNFILLED';
+            const isMyShift = s.assignedToId && s.assignedToId === currentEmployeeId;
+            const hasNobody = !s.assignedToId;
 
-        let actionsHtml = '';
-        if (isOpen) {
-            actionsHtml = `
-                <div class="shift-card__actions">
-                    <button class="btn btn--success btn--sm" onclick="takeShift(${s.id})"
-                        ${!currentEmployeeId ? 'disabled title="Chọn nhân viên trước"' : ''}>
-                        ✋ Nhận Ca
-                    </button>
-                    <button class="btn btn--primary btn--sm" onclick="showCandidates(${s.id})">
-                        🤖 AI Gợi Ý
-                    </button>
-                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
-                        ✏️ Sửa
-                    </button>
-                </div>`;
-        } else if (isMyShift && s.status === 'ASSIGNED') {
-            actionsHtml = `
-                <div class="shift-card__actions">
-                    <button class="btn btn--danger btn--sm" onclick="releaseShift(${s.id})">
-                        Nhả Ca
-                    </button>
-                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
-                        ✏️ Sửa
-                    </button>
-                </div>`;
-        } else {
-            actionsHtml = `
-                <div class="shift-card__actions">
-                    <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
-                        ✏️ Sửa
-                    </button>
-                </div>`;
-        }
+            // AI suggestion button - hiển thị cho mọi ca khi là ADMIN
+            const showAiBtn = currentUserRole === 'ADMIN';
+            const aiCacheKey = `shift_${s.id}`;
+            const hasCachedSuggestion = aiSuggestionCache[aiCacheKey];
 
-        return `
-            <div class="shift-card shift-card--${s.status}">
-                <div class="shift-card__header">
-                    <div>
-                        <div class="shift-card__title">${s.title}</div>
-                        <div class="shift-card__id">ID: #${s.id}</div>
+            let actionsHtml = '<div class="shift-card__actions">';
+            
+            if (isOpen) {
+                actionsHtml += `
+                        <button class="btn btn--success btn--sm" onclick="takeShift(${s.id})"
+                            ${!currentEmployeeId ? 'disabled title="Chọn nhân viên trước"' : ''}>
+                            ✋ Nhận Ca
+                        </button>`;
+            }
+            
+            if (showAiBtn) {
+                actionsHtml += `
+                        <button class="btn btn--ai btn--sm" onclick="showCandidatesSafe(${s.id})" id="aiBtnShift${s.id}">
+                            🤖 AI Gợi Ý ${hasCachedSuggestion ? '(đã lưu)' : ''}
+                        </button>`;
+            }
+            
+            if (isMyShift && (s.status === 'ASSIGNED' || s.status === 'TAKEN')) {
+                actionsHtml += `
+                        <button class="btn btn--danger btn--sm" onclick="releaseShift(${s.id})">
+                            Nhả Ca
+                        </button>`;
+            }
+            
+            actionsHtml += `
+                        <button class="btn btn--outline btn--sm" onclick="openEditShiftModal(${s.id})">
+                            ✏️ Sửa
+                        </button>
+                    </div>`;
+
+            return `
+                <div class="shift-card shift-card--${s.status}">
+                    <div class="shift-card__header">
+                        <div>
+                            <div class="shift-card__title">${s.title}</div>
+                            <div class="shift-card__id">ID: #${s.id}</div>
+                        </div>
+                        <span class="shift-card__status status--${s.status}">${formatStatus(s.status)}</span>
                     </div>
-                    <span class="shift-card__status status--${s.status}">${formatStatus(s.status)}</span>
-                </div>
-                <div class="shift-card__details">
-                    <div class="shift-card__detail">
-                        <span class="shift-card__detail-icon">🕐</span>
-                        ${formatTimeRange(s.startTime, s.endTime)}
+                    <div class="shift-card__details">
+                        <div class="shift-card__detail">
+                            <span class="shift-card__detail-icon">🕐</span>
+                            ${formatTimeRange(s.startTime, s.endTime)}
+                        </div>
+                        <div class="shift-card__detail">
+                            <span class="shift-card__detail-icon">🏢</span>
+                            ${s.branchName || 'Chưa xác định'}
+                        </div>
+                        <div class="shift-card__detail">
+                            <span class="shift-card__detail-icon">🎯</span>
+                            ${s.requiredSkillName || 'Không yêu cầu'} — Level ${s.requiredLevel}
+                        </div>
+                        <div class="shift-card__detail">
+                            <span class="shift-card__detail-icon">👤</span>
+                            ${s.assignedToName || '<em style="color: var(--accent-green)">Chưa có người nhận</em>'}
+                        </div>
                     </div>
-                    <div class="shift-card__detail">
-                        <span class="shift-card__detail-icon">🏢</span>
-                        ${s.branchName || 'Chưa xác định'}
-                    </div>
-                    <div class="shift-card__detail">
-                        <span class="shift-card__detail-icon">🎯</span>
-                        ${s.requiredSkillName || 'Không yêu cầu'} — Level ${s.requiredLevel}
-                    </div>
-                    <div class="shift-card__detail">
-                        <span class="shift-card__detail-icon">👤</span>
-                        ${s.assignedToName || '<em style="color: var(--accent-green)">Chưa có người nhận</em>'}
-                    </div>
-                </div>
-                ${actionsHtml}
+                    ${actionsHtml}
+                </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('Lỗi khi render danh sách ca:', err);
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state__icon">⚠️</div>
+                <div class="empty-state__text">Lỗi hiển thị ca: ${err.message}</div>
             </div>`;
-    }).join('');
+    }
 }
 
 /** Cập nhật stats bar */
 function updateStats() {
+    if (!allShifts || !Array.isArray(allShifts)) return;
     const count = (status) => allShifts.filter(s => s.status === status).length;
-    document.getElementById('statTotal').textContent = allShifts.length;
-    document.getElementById('statOpen').textContent = count('OPEN');
-    document.getElementById('statTaken').textContent = count('TAKEN');
-    document.getElementById('statForce').textContent = count('FORCE_ASSIGNED');
-    document.getElementById('statUnfilled').textContent = count('UNFILLED');
+    // Ca đã nhận = tất cả các ca đã có người nhận hoặc được gán
+    const takenCount = allShifts.filter(s => s.assignedToId != null || s.status === 'TAKEN' || s.status === 'ASSIGNED' || s.status === 'FORCE_ASSIGNED').length;
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setVal('statTotal', allShifts.length);
+    setVal('statOpen', count('OPEN'));
+    setVal('statTaken', takenCount);
+    setVal('statUnfilled', count('UNFILLED'));
+    setVal('statAssigned', count('ASSIGNED'));
+    setVal('statForce', count('FORCE_ASSIGNED'));
 }
 
 /** Refresh tất cả data */
@@ -1017,7 +1108,7 @@ function formatStatus(status) {
         'ASSIGNED': 'Đã gán',
         'OPEN': 'Đang mở',
         'TAKEN': 'Đã nhận',
-        'FORCE_ASSIGNED': 'Auto gán',
+        'FORCE_ASSIGNED': 'Đã gán (AI)',
         'UNFILLED': 'Bỏ trống'
     };
     return map[status] || status;
@@ -1035,4 +1126,275 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, 4000);
+}
+
+// ============================================================
+// NGÀY THÁNG HIỆN TẠI
+// ============================================================
+function updateCurrentDateDisplay() {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = now.toLocaleDateString('vi-VN', options);
+    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const el = document.getElementById('currentDateText');
+    if (el) el.textContent = `${dateStr} • ${timeStr}`;
+}
+
+// ============================================================
+// HỆ THỐNG THÔNG BÁO (NOTIFICATION)
+// ============================================================
+function initNotificationSystem() {
+    const btn = document.getElementById('notificationBtn');
+    const dropdown = document.getElementById('notificationDropdown');
+    const clearBtn = document.getElementById('clearNotifications');
+
+    if (btn) {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = dropdown.style.display !== 'none';
+            dropdown.style.display = isVisible ? 'none' : 'block';
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            notifications = [];
+            localStorage.setItem('flexishift_notifications', '[]');
+            renderNotifications();
+        });
+    }
+
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+        const wrapper = document.getElementById('notificationWrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    renderNotifications();
+}
+
+function addNotification(message, type = 'info') {
+    const notif = {
+        id: Date.now(),
+        message,
+        type,
+        time: new Date().toISOString(),
+        read: false
+    };
+    notifications.unshift(notif);
+    // Keep max 20 notifications
+    if (notifications.length > 20) notifications = notifications.slice(0, 20);
+    localStorage.setItem('flexishift_notifications', JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function renderNotifications() {
+    const list = document.getElementById('notificationList');
+    const badge = document.getElementById('notificationBadge');
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    if (!list) return;
+
+    if (notifications.length === 0) {
+        list.innerHTML = '<div class="notification-dropdown__empty">Không có thông báo mới</div>';
+        return;
+    }
+
+    list.innerHTML = notifications.map(n => {
+        const timeAgo = getTimeAgo(new Date(n.time));
+        const typeIcon = n.type === 'success' ? '✅' : n.type === 'warning' ? '⚠️' : n.type === 'error' ? '❌' : 'ℹ️';
+        return `
+            <div class="notification-item ${n.read ? '' : 'notification-item--unread'}" onclick="markNotificationRead(${n.id})">
+                <span class="notification-item__icon">${typeIcon}</span>
+                <div class="notification-item__content">
+                    <div class="notification-item__message">${n.message}</div>
+                    <div class="notification-item__time">${timeAgo}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function markNotificationRead(id) {
+    const notif = notifications.find(n => n.id === id);
+    if (notif) notif.read = true;
+    localStorage.setItem('flexishift_notifications', JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'Vừa xong';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} phút trước`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} giờ trước`;
+    const days = Math.floor(hours / 24);
+    return `${days} ngày trước`;
+}
+
+// ============================================================
+// AI GỢI Ý VỚI CACHE & RATE LIMITING
+// ============================================================
+
+/** Gọi AI gợi ý có cache và rate limiting để tránh hết token */
+async function showCandidatesSafe(shiftId) {
+    const cacheKey = `shift_${shiftId}`;
+
+    // Kiểm tra cache trước
+    if (aiSuggestionCache[cacheKey]) {
+        const cached = aiSuggestionCache[cacheKey];
+        const ageMinutes = (Date.now() - cached.timestamp) / 60000;
+        
+        // Cache valid trong 10 phút
+        if (ageMinutes < 10) {
+            renderCachedCandidates(shiftId, cached.data);
+            showToast('📋 Hiển thị gợi ý AI đã lưu (cache)', 'info');
+            return;
+        }
+    }
+
+    // Rate limiting check
+    if (aiRateLimited) {
+        showToast('⚠️ AI đang bị giới hạn. Vui lòng đợi 1 phút rồi thử lại.', 'warning');
+        // Still show cached result if available
+        if (aiSuggestionCache[cacheKey]) {
+            renderCachedCandidates(shiftId, aiSuggestionCache[cacheKey].data);
+        }
+        return;
+    }
+
+    if (aiCallCount >= AI_CALL_LIMIT) {
+        showToast('⚠️ Đã đạt giới hạn gọi AI trong phiên này. Sử dụng kết quả đã lưu hoặc tải lại trang.', 'warning');
+        if (aiSuggestionCache[cacheKey]) {
+            renderCachedCandidates(shiftId, aiSuggestionCache[cacheKey].data);
+        }
+        return;
+    }
+
+    // Call AI with error handling for token exhaustion
+    try {
+        aiCallCount++;
+        const panel = document.getElementById('candidatesPanel');
+        panel.innerHTML = `
+            <div class="candidates-panel">
+                <div class="candidates-panel__title">
+                    <span class="spinner"></span> Đang gọi AI chấm điểm cho ca #${shiftId}...
+                    <span style="font-size: 12px; color: var(--text-muted);">(Lượt gọi: ${aiCallCount}/${AI_CALL_LIMIT})</span>
+                </div>
+            </div>`;
+
+        const data = await apiFetch(`${API_BASE}/shifts/${shiftId}/candidates`);
+
+        // Save to cache
+        aiSuggestionCache[cacheKey] = {
+            data: data,
+            timestamp: Date.now()
+        };
+
+        renderCachedCandidates(shiftId, data);
+
+    } catch (err) {
+        const errMsg = err.message || '';
+        // Detect token/quota exhaustion
+        if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('hết lượt')) {
+            aiRateLimited = true;
+            showToast('🚨 API AI đã hết lượt gọi (429). Tự động giới hạn để bảo vệ chương trình.', 'error');
+            // Auto unlock after 60 seconds
+            setTimeout(() => {
+                aiRateLimited = false;
+                showToast('✅ AI đã sẵn sàng trở lại', 'success');
+            }, 60000);
+        }
+
+        const panel = document.getElementById('candidatesPanel');
+        panel.innerHTML = `
+            <div class="candidates-panel">
+                <div class="candidates-panel__title">🤖 AI Gợi Ý — Ca #${shiftId}</div>
+                <div class="empty-state">
+                    <div class="empty-state__icon">⚠️</div>
+                    <div class="empty-state__text">${errMsg.includes('429') ? 'AI đã hết lượt gọi miễn phí. Vui lòng đợi 1 phút.' : errMsg}</div>
+                </div>
+                ${aiSuggestionCache[cacheKey] ? '<button class="btn btn--outline btn--sm" onclick="renderCachedCandidates(' + shiftId + ', aiSuggestionCache.shift_' + shiftId + '.data)" style="margin: 10px auto; display: block;">📋 Xem kết quả cũ</button>' : ''}
+            </div>`;
+    }
+}
+
+/** Render candidates from cache */
+function renderCachedCandidates(shiftId, data) {
+    const panel = document.getElementById('candidatesPanel');
+
+    if (!data || !data.ranked_candidates || data.ranked_candidates.length === 0) {
+        panel.innerHTML = `
+            <div class="candidates-panel">
+                <div class="candidates-panel__title">🤖 AI Gợi Ý — Ca #${shiftId}</div>
+                <div class="empty-state">
+                    <div class="empty-state__icon">😕</div>
+                    <div class="empty-state__text">Không tìm thấy ứng viên phù hợp</div>
+                </div>
+            </div>`;
+        return;
+    }
+
+    const candidatesHtml = data.ranked_candidates.map((c, i) => {
+        const rank = i + 1;
+        const rankClass = rank <= 3 ? `candidate-row__rank--${rank}` : 'candidate-row__rank--default';
+        const scoreClass = c.match_score >= 70 ? 'high' : c.match_score >= 40 ? 'mid' : 'low';
+        const breakdown = c.breakdown || {};
+
+        return `
+            <div class="candidate-row">
+                <div class="candidate-row__rank ${rankClass}">${rank}</div>
+                <div class="candidate-row__info">
+                    <div class="candidate-row__name">${c.full_name}</div>
+                    <div class="candidate-row__details">
+                        Tin cậy: ${breakdown.reliability ?? '—'}% ·
+                        Kỹ năng: ${breakdown.skill_fit ?? '—'}% ·
+                        Giờ: ${breakdown.time_fit ?? '—'}% ·
+                        Khối lượng: ${breakdown.workload_fit ?? '—'}% ·
+                        Chi nhánh: ${breakdown.location_fit ?? '—'}%
+                    </div>
+                    <div class="candidate-row__explanation" style="margin-top: 8px; font-size: 13px; color: var(--text-secondary); background: #f8fafc; padding: 6px 10px; border-radius: 4px; border-left: 3px solid var(--accent-blue);">
+                        💡 <strong>AI nhận xét:</strong> ${breakdown.explanation || 'Không có thông tin chi tiết.'}
+                    </div>
+                </div>
+                <div class="candidate-row__score">
+                    <div class="candidate-row__score-value" style="color: var(--accent-${scoreClass === 'high' ? 'green' : scoreClass === 'mid' ? 'orange' : 'red'})">${c.match_score}%</div>
+                    <div class="candidate-row__score-label">Match Score</div>
+                    <div class="score-bar">
+                        <div class="score-bar__fill score-bar__fill--${scoreClass}" style="width: ${c.match_score}%"></div>
+                    </div>
+                </div>
+                <div class="candidate-row__action">
+                    <button class="btn btn--success btn--sm" onclick="takeShiftForCandidate(${shiftId}, ${c.employee_id})">
+                        Gán ca
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+
+    const cacheInfo = aiSuggestionCache[`shift_${shiftId}`];
+    const cacheTime = cacheInfo ? new Date(cacheInfo.timestamp).toLocaleTimeString('vi-VN') : '';
+
+    panel.innerHTML = `
+        <div class="candidates-panel">
+            <div class="candidates-panel__title">
+                🤖 AI Gợi Ý — Ca #${shiftId}
+                <span style="margin-left: auto; font-size: 13px; font-weight: 400; color: var(--text-secondary);">
+                    ${data.total_candidates} ứng viên ${cacheTime ? `· Cache lúc ${cacheTime}` : ''}
+                </span>
+                <button class="btn btn--outline btn--sm" onclick="closeCandidatesPanel()" style="margin-left: 12px;">✕ Đóng</button>
+            </div>
+            ${candidatesHtml}
+        </div>`;
 }

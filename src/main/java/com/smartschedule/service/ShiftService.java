@@ -219,10 +219,10 @@ public class ShiftService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca #" + shiftId));
 
-        // Kiểm tra trạng thái OPEN
-        if (shift.getStatus() != ShiftStatus.OPEN) {
+        // Kiểm tra trạng thái: cho phép nhận/gán ca OPEN hoặc ca bị bỏ trống UNFILLED
+        if (shift.getStatus() != ShiftStatus.OPEN && shift.getStatus() != ShiftStatus.UNFILLED) {
             throw new IllegalStateException(
-                    "Ca này không còn mở. Trạng thái hiện tại: " + shift.getStatus());
+                    "Ca này không còn mở để nhận. Trạng thái hiện tại: " + shift.getStatus());
         }
 
         Employee employee = employeeRepository.findById(employeeId)
@@ -300,9 +300,7 @@ public class ShiftService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca #" + shiftId));
 
-        if (shift.getStatus() != ShiftStatus.OPEN) {
-            throw new IllegalStateException("Chỉ tìm ứng viên cho ca OPEN. Trạng thái hiện tại: " + shift.getStatus());
-        }
+        // Cho phép AI gợi ý cho mọi ca (OPEN, UNFILLED hoặc ca đã có người để tìm ứng viên thay thế)
 
         // ── Bước 1: Lọc nhân viên đủ điều kiện (Repository query) ──
         LocalDateTime weekStart = shift.getStartTime()

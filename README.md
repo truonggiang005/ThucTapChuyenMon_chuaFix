@@ -215,7 +215,6 @@ Mở trình duyệt web và truy cập:
 ## 👥 Đội ngũ Phát triển
 
 Dự án được xây dựng và phát triển với sự đóng góp của:
-
 * 👨‍💻 **Trường Giang** - Fullstack & AI Developer *(Spring Boot, AI Integration, Frontend)*
 
 <div align="center">

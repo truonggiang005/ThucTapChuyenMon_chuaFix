@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="FlexiShift AI - Hệ thống quản lý ca làm việc tích hợp AI chấm điểm và phân bổ nhân sự">
-    <title>FlexiShift AI | Smart Shift Management</title>
-    <link rel="stylesheet" href="/css/style.css" th:href="@{/css/style.css}">
+    <title>FlexiShift AI | Quản Lý Ca Làm Việc</title>
+    <link rel="stylesheet" href="/css/style.css?v=20261015_04" th:href="@{/css/style.css(v='20261015_04')}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
     <script>
         // Kiểm tra ngay lập tức trước khi tải giao diện
@@ -32,6 +32,40 @@
         </div>
     </div>
     <div class="header__right" style="display: flex; align-items: center; gap: 15px;">
+        <div class="header__date-display" id="currentDateDisplay">
+            <span class="header__date-icon">📅</span>
+            <span class="header__date-text" id="currentDateText">--</span>
+        </div>
+        <script>
+            (function() {
+                function updateHeaderDate() {
+                    try {
+                        const now = new Date();
+                        const d = now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        const t = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                        const el = document.getElementById('currentDateText');
+                        if (el) el.textContent = d + ' • ' + t;
+                    } catch(e) {}
+                }
+                updateHeaderDate();
+                setInterval(updateHeaderDate, 30000);
+            })();
+        </script>
+        <div class="header__notification" id="notificationWrapper">
+            <button class="header__notification-btn" id="notificationBtn" title="Thông báo">
+                🔔
+                <span class="header__notification-badge" id="notificationBadge" style="display: none;">0</span>
+            </button>
+            <div class="header__notification-dropdown" id="notificationDropdown" style="display: none;">
+                <div class="notification-dropdown__header">
+                    <span class="notification-dropdown__title">🔔 Thông báo</span>
+                    <button class="notification-dropdown__clear" id="clearNotifications">Xóa tất cả</button>
+                </div>
+                <div class="notification-dropdown__list" id="notificationList">
+                    <div class="notification-dropdown__empty">Không có thông báo mới</div>
+                </div>
+            </div>
+        </div>
         <div class="header__user-info" id="userInfoDisplay">
             <span class="header__user-name" id="userName">—</span>
             <span class="header__user-role" id="userRoleStr">(Nhân viên)</span>
@@ -170,13 +204,12 @@
                 <div class="stat-card__value stat-card__value--cyan" id="statTaken">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-card__label">Auto Gán</div>
-                <div class="stat-card__value stat-card__value--orange" id="statForce">0</div>
-            </div>
-            <div class="stat-card">
                 <div class="stat-card__label">Bỏ Trống</div>
                 <div class="stat-card__value stat-card__value--red" id="statUnfilled">0</div>
             </div>
+            <!-- Fallback elements for cached scripts -->
+            <span id="statAssigned" style="display:none">0</span>
+            <span id="statForce" style="display:none">0</span>
         </div>
 
         <!-- Create Shift Form -->
@@ -305,6 +338,6 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/js/app.js" th:src="@{/js/app.js}"></script>
+<script src="/js/app.js?v=20261015_04" th:src="@{/js/app.js(v='20261015_04')}"></script>
 </body>
 </html>

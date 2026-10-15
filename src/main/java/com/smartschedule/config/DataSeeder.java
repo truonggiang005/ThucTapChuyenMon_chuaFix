@@ -131,9 +131,10 @@ public class DataSeeder implements CommandLineRunner {
         employeeSkillRepository.saveAll(skills);
 
         // ── 5. Ca làm việc mẫu (dùng plusDays(2) và plusDays(3) để đảm bảo còn hiệu lực) ──
+        //     ★ Tất cả ca ban đầu đều được gán cho nhân viên (ASSIGNED)
         LocalDateTime dayAfterTomorrow = LocalDateTime.now().plusDays(2).withHour(0).withMinute(0).withSecond(0).withNano(0);
 
-        // Ca 1: ASSIGNED cho An (sáng ngày kia)
+        // Ca 1: ASSIGNED cho An (sáng ngày kia - HCM)
         shiftRepository.save(Shift.builder()
                 .title("Ca sáng - Pha chế")
                 .startTime(dayAfterTomorrow.withHour(7))
@@ -141,23 +142,23 @@ public class DataSeeder implements CommandLineRunner {
                 .requiredLevel(3).branch(hcm).requiredSkill(barista)
                 .assignedTo(emp1).status(ShiftStatus.ASSIGNED).build());
 
-        // Ca 2: OPEN (An đã nhả) - chờ người nhận
+        // Ca 2: ASSIGNED cho Bình (chiều ngày kia - HCM)
         shiftRepository.save(Shift.builder()
                 .title("Ca chiều - Thu ngân")
                 .startTime(dayAfterTomorrow.withHour(13))
                 .endTime(dayAfterTomorrow.withHour(21))
                 .requiredLevel(2).branch(hcm).requiredSkill(cashier)
-                .assignedTo(null).status(ShiftStatus.OPEN).build());
+                .assignedTo(emp2).status(ShiftStatus.ASSIGNED).build());
 
-        // Ca 3: OPEN (sáng ngày tiếp theo)
+        // Ca 3: ASSIGNED cho Cường (sáng ngày tiếp theo - HCM)
         shiftRepository.save(Shift.builder()
                 .title("Ca sáng - Bếp")
                 .startTime(dayAfterTomorrow.plusDays(1).withHour(6))
                 .endTime(dayAfterTomorrow.plusDays(1).withHour(14))
                 .requiredLevel(3).branch(hcm).requiredSkill(kitchen)
-                .assignedTo(null).status(ShiftStatus.OPEN).build());
+                .assignedTo(emp3).status(ShiftStatus.ASSIGNED).build());
 
-        // Ca 4: ASSIGNED cho Đức (Hà Nội)
+        // Ca 4: ASSIGNED cho Đức (sáng ngày kia - Hà Nội)
         shiftRepository.save(Shift.builder()
                 .title("Ca sáng - Pha chế HN")
                 .startTime(dayAfterTomorrow.withHour(8))
@@ -165,13 +166,29 @@ public class DataSeeder implements CommandLineRunner {
                 .requiredLevel(4).branch(hn).requiredSkill(barista)
                 .assignedTo(emp4).status(ShiftStatus.ASSIGNED).build());
 
-        // Ca 5: OPEN (Hà Nội - chiều ngày kia)
+        // Ca 5: ASSIGNED cho Ema (chiều ngày kia - Hà Nội)
         shiftRepository.save(Shift.builder()
                 .title("Ca chiều - Thu ngân HN")
                 .startTime(dayAfterTomorrow.withHour(14))
                 .endTime(dayAfterTomorrow.withHour(22))
                 .requiredLevel(2).branch(hn).requiredSkill(cashier)
-                .assignedTo(null).status(ShiftStatus.OPEN).build());
+                .assignedTo(emp5).status(ShiftStatus.ASSIGNED).build());
+
+        // Ca 6: ASSIGNED cho An (tối ngày tiếp theo - HCM)
+        shiftRepository.save(Shift.builder()
+                .title("Ca tối - Bếp")
+                .startTime(dayAfterTomorrow.plusDays(1).withHour(17))
+                .endTime(dayAfterTomorrow.plusDays(1).withHour(23))
+                .requiredLevel(2).branch(hcm).requiredSkill(kitchen)
+                .assignedTo(emp1).status(ShiftStatus.ASSIGNED).build());
+
+        // Ca 7: ASSIGNED cho Đức (chiều 2 ngày sau - Hà Nội)
+        shiftRepository.save(Shift.builder()
+                .title("Ca chiều - Pha chế HN")
+                .startTime(dayAfterTomorrow.plusDays(2).withHour(13))
+                .endTime(dayAfterTomorrow.plusDays(2).withHour(21))
+                .requiredLevel(1).branch(hn).requiredSkill(barista)
+                .assignedTo(emp4).status(ShiftStatus.ASSIGNED).build());
 
         // ── 6. Lịch bận mẫu (BusySchedule) ──
         // Cường bận buổi sáng ngày kia (nghỉ phép)
@@ -190,7 +207,7 @@ public class DataSeeder implements CommandLineRunner {
                 .reason("Đi khám bệnh")
                 .build());
 
-        log.info("[SEEDER] ✅ Seed hoàn tất: 2 branches, 3 skills, 5 employees, 5 shifts, 2 busy schedules");
+        log.info("[SEEDER] ✅ Seed hoàn tất: 2 branches, 3 skills, 5 employees, 7 shifts (tất cả 7 ca đều đã được GÁN cho NV), 2 busy schedules");
     }
 }
 
