@@ -1,0 +1,33 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
+# Python
+__pycache__/
+*.pyc
+src/ai-service/venv/
+src/ai-service/env/
+venv/
+.venv/
+
+# Khóa bí mật / biến môi trường: KHÔNG commit (SEC-11). Chỉ commit file mẫu *.env.example / .env.example
+.env
+*.env
+.env.*
+!.env.example
+!*.env.example
+
+# Frontend / Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
