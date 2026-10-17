@@ -75,8 +75,8 @@ public class DataSeeder implements CommandLineRunner {
         // Mật khẩu thật được băm bằng BCrypt (không dùng hash giả); An (id 1) là ADMIN, còn lại EMPLOYEE
         String hash = passwordEncoder.encode(seedPassword);
         Employee emp1 = employeeRepository.save(Employee.builder()
-                .fullName("Nguyễn Văn An")
-                .email("an@smartschedule.com")
+                .fullName("Trần Xuân Bách")
+                .email("bach@gmail.com")
                 .role(Role.ADMIN)
                 .passwordHash(hash)
                 .maxHoursPerWeek(20)
@@ -85,8 +85,8 @@ public class DataSeeder implements CommandLineRunner {
                 .primaryBranch(hcm).build());
 
         Employee emp2 = employeeRepository.save(Employee.builder()
-                .fullName("Trần Thị Bình")
-                .email("binh@smartschedule.com")
+                .fullName("Lưu Trường Giang")
+                .email("giang@gmail.com")
                 .passwordHash(hash)
                 .maxHoursPerWeek(15)
                 .totalCompleted(35).totalCancelled(5).lateArrivalCount(3)
@@ -94,8 +94,8 @@ public class DataSeeder implements CommandLineRunner {
                 .primaryBranch(hcm).build());
 
         Employee emp3 = employeeRepository.save(Employee.builder()
-                .fullName("Lê Hoàng Cường")
-                .email("cuong@smartschedule.com")
+                .fullName("Phạm Khánh Ly")
+                .email("ly@gmail.com")
                 .passwordHash(hash)
                 .maxHoursPerWeek(29)
                 .totalCompleted(20).totalCancelled(8).lateArrivalCount(5)
@@ -103,8 +103,8 @@ public class DataSeeder implements CommandLineRunner {
                 .primaryBranch(hcm).build());
 
         Employee emp4 = employeeRepository.save(Employee.builder()
-                .fullName("Phạm Minh Đức")
-                .email("duc@smartschedule.com")
+                .fullName("Nguyễn Sơn Vũ")
+                .email("vu@gmail.com")
                 .passwordHash(hash)
                 .maxHoursPerWeek(34)
                 .totalCompleted(45).totalCancelled(1).lateArrivalCount(0)
@@ -112,8 +112,8 @@ public class DataSeeder implements CommandLineRunner {
                 .primaryBranch(hn).build());
 
         Employee emp5 = employeeRepository.save(Employee.builder()
-                .fullName("Hoàng Thị Ema")
-                .email("ema@smartschedule.com")
+                .fullName("Đặng Thị Phương Nga")
+                .email("nga@gmail.com")
                 .passwordHash(hash)
                 .maxHoursPerWeek(17)
                 .totalCompleted(10).totalCancelled(0).lateArrivalCount(0)

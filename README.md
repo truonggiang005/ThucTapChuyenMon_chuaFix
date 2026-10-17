@@ -163,18 +163,18 @@ Mở trình duyệt web và truy cập:
 **Tài khoản đăng nhập mẫu** (chỉ có khi seed dữ liệu ở môi trường phát triển; mật khẩu mẫu `123456` đặt ở `app.seed.password`, được băm BCrypt; vai trò lưu trong DB, không còn suy ra từ id):
 | Email | Họ và tên | Vai trò |
 | :--- | :--- | :--- |
-| `an@smartschedule.com` | Nguyễn Văn An | **Quản lý (Admin)** |
-| `binh@smartschedule.com` | Trần Thị Bình | **Nhân viên** |
-| `cuong@smartschedule.com` | Lê Hoàng Cường | **Nhân viên** |
-| `duc@smartschedule.com` | Phạm Minh Đức | **Nhân viên** |
-| `ema@smartschedule.com` | Hoàng Thị Ema | **Nhân viên** |
+| `bach@gmail.com` | Trần Xuân Bách | **Quản lý (Admin)** |
+| `giang@gmail.com` | Lưu Trường Giang | **Nhân viên** |
+| `ly@gmail.com` | Phạm Khánh Ly | **Nhân viên** |
+| `vu@gmail.com` | Nguyễn Sơn Vũ | **Nhân viên** |
+| `nga@gmail.com` | Đặng Thị Phương Nga | **Nhân viên** |
 
 ---
 
 ## 🧪 Kịch bản Kiểm thử các Chức năng Chính (Testing Guide)
 
 ### Kịch bản 1: Đổi ca & Xử lý Tương tranh (Optimistic Locking)
-1. Đăng nhập tài khoản `an@smartschedule.com`.
+1. Đăng nhập tài khoản `bach@gmail.com`.
 2. Vào trang **Lịch Cá Nhân**, tìm ca có trạng thái `ASSIGNED` và bấm nút **Nhả Ca**.
 3. Ca này sẽ chuyển sang trạng thái `OPEN` và lập tức xuất hiện trên mục **Chợ Ca Trực**.
 4. **Kiểm tra tương tranh:**
