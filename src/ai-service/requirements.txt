@@ -1,0 +1,8 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+# SDK Gemini: bản 0.3.0 cũ không dùng được (B9). Dòng 2.x hiện hành, Python >= 3.10. Chặn < 3.0 vì 3.0 sẽ có thay đổi phá vỡ (theo ghi chú của Google).
+google-genai>=2.14,<3.0
+python-dotenv==1.0.1
+# Chỉ cần cho generate_report.py ở thư mục gốc dự án (không dùng bởi AI service khi chạy)
+python-docx>=1.1,<2.0

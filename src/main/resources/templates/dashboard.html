@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FlexiShift AI - Hệ thống quản lý ca làm việc tích hợp AI chấm điểm và phân bổ nhân sự">
+    <title>FlexiShift AI | Quản Lý Ca Làm Việc</title>
+    <!-- Chỉ tải tài nguyên cùng origin (CSP style-src/font-src 'self'): không còn Google Fonts, không còn style="..." trong markup -->
+    <link rel="stylesheet" href="/css/style.css?v=20261018_01" th:href="@{/css/style.css(v='20261018_01')}">
+</head>
+<body>
+
+<a class="skip-link" href="#mainContent">Bỏ qua điều hướng</a>
+
+<!-- ═══════════════════ HEADER / NAV ═══════════════════ -->
+<header class="header" id="mainHeader">
+    <div class="header__left">
+        <div class="header__brand">FlexiShift AI</div>
+        <nav class="header__nav" aria-label="Điều hướng chính">
+            <a href="#" class="nav-link active" data-page="personal-schedule" id="navPersonal">Lịch Cá Nhân</a>
+            <a href="#" class="nav-link" data-page="shift-market" id="navMarket">Chợ Ca Trực</a>
+            <a href="#" class="nav-link" data-page="account" id="navAccount">Tài Khoản</a>
+            <a href="#" class="nav-link" data-page="admin" id="navAdmin" hidden>⚙️ Quản Lý</a>
+        </nav>
+        <div class="header__ai-status" id="aiStatus" role="status" title="Đang kiểm tra AI…">
+            <span class="header__ai-dot" id="aiStatusDot" aria-hidden="true"></span>
+            <span id="aiStatusText">AI</span>
+        </div>
+    </div>
+    <div class="header__right">
+        <div class="header__date-display" id="currentDateDisplay">
+            <span class="header__date-icon" aria-hidden="true">📅</span>
+            <span class="header__date-text" id="currentDateText">--</span>
+        </div>
+        <div class="header__notification" id="notificationWrapper">
+            <button type="button" class="header__notification-btn" id="notificationBtn" title="Thông báo"
+                    aria-label="Thông báo" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown">
+                <span aria-hidden="true">🔔</span>
+                <span class="header__notification-badge" id="notificationBadge" hidden>0</span>
+            </button>
+            <div class="header__notification-dropdown" id="notificationDropdown" hidden>
+                <div class="notification-dropdown__header">
+                    <span class="notification-dropdown__title">🔔 Thông báo</span>
+                    <span class="notification-dropdown__tools">
+                        <button type="button" class="notification-dropdown__clear" id="markAllNotifications">Đã đọc hết</button>
+                        <button type="button" class="notification-dropdown__clear" id="clearNotifications">Xóa tất cả</button>
+                    </span>
+                </div>
+                <div class="notification-dropdown__list" id="notificationList">
+                    <div class="notification-dropdown__empty">Không có thông báo</div>
+                </div>
+            </div>
+        </div>
+        <div class="header__user-info" id="userInfoDisplay">
+            <span class="header__user-name" id="userName">—</span>
+            <span class="header__user-role" id="userRoleStr">(Nhân viên)</span>
+        </div>
+        <button type="button" id="btnLogout" class="btn btn--outline btn--sm btn--logout">Đăng Xuất</button>
+    </div>
+</header>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<main class="main" id="mainContent">
+
+    <!-- ============ PAGE 1: Lịch Cá Nhân Tổng Hợp ============ -->
+    <section class="page active" id="page-personal-schedule" aria-labelledby="title-personal">
+        <h1 class="page-title" id="title-personal">Lịch Cá Nhân Tổng Hợp</h1>
+
+        <div class="personal-layout">
+            <!-- LEFT: lịch theo tuần/ngày -->
+            <div class="weekly-schedule" id="weeklySchedule" aria-live="polite">
+                <div class="empty-state">
+                    <div class="empty-state__icon" aria-hidden="true">⏳</div>
+                    <div class="empty-state__text">Đang tải lịch của bạn…</div>
+                </div>
+            </div>
+
+            <!-- RIGHT: lịch bận + đăng ký -->
+            <div class="right-panel">
+                <div class="busy-entries" id="busyEntriesDisplay"></div>
+
+                <div class="registration-panel">
+                    <h2 class="registration-panel__title">Đăng Ký Lịch Bận &amp; Báo Nghỉ</h2>
+                    <p class="busy-for">👤 Đang đăng ký cho: <strong id="busyEmployeeNameDisplay">—</strong></p>
+
+                    <form id="busyScheduleForm" class="busy-form">
+                        <div class="busy-form__row">
+                            <div class="busy-form__group">
+                                <label class="form-label" for="busyDate">📅 Từ ngày</label>
+                                <input type="date" id="busyDate" class="form-input" required>
+                            </div>
+                            <div class="busy-form__group">
+                                <label class="form-label" for="busyEndDate">📅 Đến ngày (nếu nghỉ nhiều ngày)</label>
+                                <input type="date" id="busyEndDate" class="form-input">
+                            </div>
+                        </div>
+                        <div class="busy-form__row">
+                            <div class="busy-form__group">
+                                <label class="form-label" for="busyStartTime">⏰ Giờ bắt đầu</label>
+                                <input type="time" id="busyStartTime" class="form-input form-input--time" value="14:00" required>
+                            </div>
+                            <div class="busy-form__group">
+                                <label class="form-label" for="busyEndTime">⏰ Giờ kết thúc</label>
+                                <input type="time" id="busyEndTime" class="form-input form-input--time" value="18:00" required>
+                            </div>
+                        </div>
+                        <div class="busy-form__row">
+                            <div class="busy-form__group busy-form__group--wide">
+                                <label class="form-label" for="busyReason">✏️ Lý do (tùy chọn)</label>
+                                <input type="text" id="busyReason" class="form-input" maxlength="300" placeholder="Khám bệnh, việc gia đình…">
+                            </div>
+                        </div>
+                        <div class="busy-form__stats" id="busyStats"></div>
+                        <button type="submit" class="btn btn--primary btn--register" id="btnSubmitBusy">Đăng ký Lịch Bận</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ PAGE 2: Chợ Ca Trực ============ -->
+    <section class="page" id="page-shift-market" aria-labelledby="title-market">
+        <h1 class="page-title page-title--center" id="title-market">Chợ Ca Trực</h1>
+
+        <div class="market-filters">
+            <div class="filter-group">
+                <label class="filter-label" for="filterBranch">Chi nhánh</label>
+                <select class="filter-select" id="filterBranch">
+                    <option value="">Tất cả chi nhánh</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label" for="filterSkill">Vị trí</label>
+                <select class="filter-select" id="filterSkill">
+                    <option value="">Tất cả vị trí</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="marketNotice"></div>
+
+        <div class="market-grid" id="marketGrid" aria-live="polite">
+            <div class="empty-state empty-state--wide">
+                <div class="empty-state__icon" aria-hidden="true">⏳</div>
+                <div class="empty-state__text">Đang tải dữ liệu…</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ PAGE 3: Tài Khoản ============ -->
+    <section class="page" id="page-account" aria-labelledby="title-account">
+        <h1 class="page-title" id="title-account">Tài Khoản</h1>
+        <div class="account-card" id="accountInfo">
+            <div class="empty-state">
+                <div class="empty-state__icon" aria-hidden="true">⏳</div>
+                <div class="empty-state__text">Đang tải thông tin tài khoản…</div>
+            </div>
+        </div>
+
+        <div class="admin-form-container account-section">
+            <h2 class="admin-form__title">Đổi mật khẩu</h2>
+            <form id="changePasswordForm" class="admin-form">
+                <div class="admin-form__group">
+                    <label class="form-label" for="pwCurrent">Mật khẩu hiện tại</label>
+                    <input type="password" id="pwCurrent" class="form-input" autocomplete="current-password" required>
+                </div>
+                <div class="admin-form__row">
+                    <div class="admin-form__group">
+                        <label class="form-label" for="pwNew">Mật khẩu mới</label>
+                        <input type="password" id="pwNew" class="form-input" autocomplete="new-password" minlength="8" maxlength="100" required aria-describedby="pwHelp">
+                    </div>
+                    <div class="admin-form__group">
+                        <label class="form-label" for="pwConfirm">Nhập lại mật khẩu mới</label>
+                        <input type="password" id="pwConfirm" class="form-input" autocomplete="new-password" minlength="8" maxlength="100" required>
+                    </div>
+                </div>
+                <p class="form-help" id="pwHelp">Ít nhất 8 ký tự, gồm cả chữ và số.</p>
+                <button type="submit" class="btn btn--primary">Đổi mật khẩu</button>
+            </form>
+        </div>
+
+        <div class="account-section account-privacy">
+            <h2 class="admin-form__title">Quyền riêng tư dữ liệu</h2>
+            <p>Khi quản lý dùng chức năng AI Gợi Ý, hệ thống gửi tới Google Gemini dữ liệu <strong>đã ẩn danh</strong>:
+               mã nhân viên, mức kỹ năng, số ca đã hoàn thành/hủy/đến muộn, khung giờ ưa thích, số giờ đã làm trong tuần.
+               Họ tên và email <strong>không</strong> được gửi. Điểm hiển thị ở Chợ Ca được tính ngay trên máy chủ của hệ thống bằng quy tắc, không gửi tới Google.</p>
+        </div>
+    </section>
+
+    <!-- ============ PAGE 4: Quản Lý (Admin) ============ -->
+    <section class="page" id="page-admin" aria-labelledby="title-admin">
+        <h1 class="page-title" id="title-admin">Quản Lý</h1>
+
+        <div class="tabs" role="tablist" aria-label="Khu vực quản lý">
+            <button type="button" class="tabs__tab active" role="tab" id="tab-shifts" data-tab="shifts" aria-selected="true" aria-controls="adminPanel-shifts">Ca làm việc</button>
+            <button type="button" class="tabs__tab" role="tab" id="tab-employees" data-tab="employees" aria-selected="false" aria-controls="adminPanel-employees">Nhân viên</button>
+            <button type="button" class="tabs__tab" role="tab" id="tab-catalog" data-tab="catalog" aria-selected="false" aria-controls="adminPanel-catalog">Chi nhánh &amp; Kỹ năng</button>
+        </div>
+
+        <!-- ---- Tab: Ca làm việc ---- -->
+        <div id="adminPanel-shifts" role="tabpanel" aria-labelledby="tab-shifts">
+            <div class="stats-bar" id="statsBar" aria-label="Thống kê các ca đang xem">
+                <div class="stat-card"><div class="stat-card__label">Tổng ca</div><div class="stat-card__value stat-card__value--blue" id="statTotal">0</div></div>
+                <div class="stat-card"><div class="stat-card__label">Đang mở</div><div class="stat-card__value stat-card__value--green" id="statOpen">0</div></div>
+                <div class="stat-card"><div class="stat-card__label">NV tự nhận</div><div class="stat-card__value stat-card__value--cyan" id="statTaken">0</div></div>
+                <div class="stat-card"><div class="stat-card__label">Quản lý/hệ thống gán</div><div class="stat-card__value stat-card__value--blue" id="statAssigned">0</div></div>
+                <div class="stat-card"><div class="stat-card__label">Đã hoàn thành</div><div class="stat-card__value stat-card__value--green" id="statCompleted">0</div></div>
+                <div class="stat-card"><div class="stat-card__label">Bỏ trống</div><div class="stat-card__value stat-card__value--red" id="statUnfilled">0</div></div>
+            </div>
+
+            <div class="admin-form-container">
+                <h2 class="admin-form__title">Tạo Ca Làm Việc Mới</h2>
+                <form id="createShiftForm" class="admin-form">
+                    <div class="admin-form__group">
+                        <label class="form-label" for="shiftTitle">Tiêu đề ca</label>
+                        <input type="text" id="shiftTitle" required maxlength="200" placeholder="Vd: Ca sáng - Pha chế" class="form-input">
+                    </div>
+                    <div class="admin-form__row">
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftStartTime">Thời gian bắt đầu</label>
+                            <input type="datetime-local" id="shiftStartTime" required class="form-input">
+                        </div>
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftEndTime">Thời gian kết thúc</label>
+                            <input type="datetime-local" id="shiftEndTime" required class="form-input">
+                        </div>
+                    </div>
+                    <div class="admin-form__row">
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftBranch">Chi nhánh</label>
+                            <select id="shiftBranch" required class="form-input"><option value="">Đang tải…</option></select>
+                        </div>
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftSkill">Kỹ năng yêu cầu (tùy chọn)</label>
+                            <select id="shiftSkill" class="form-input"><option value="">Không yêu cầu</option></select>
+                        </div>
+                    </div>
+                    <div class="admin-form__row">
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftLevel">Level kỹ năng</label>
+                            <input type="number" id="shiftLevel" min="1" max="5" value="1" required class="form-input">
+                        </div>
+                        <div class="admin-form__group">
+                            <label class="form-label" for="shiftEmployee">Gán trước cho nhân viên (tùy chọn)</label>
+                            <select id="shiftEmployee" class="form-input"><option value="">Để trống (trạng thái OPEN)</option></select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full">Tạo Ca Làm Việc</button>
+                </form>
+            </div>
+
+            <div class="admin-shifts-section">
+                <h2 class="admin-form__title admin-form__title--spaced">Các Ca Làm Việc</h2>
+                <div class="admin-filter">
+                    <div class="filter-group">
+                        <label class="filter-label" for="adminFrom">Từ ngày</label>
+                        <input type="date" class="filter-select" id="adminFrom">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="adminTo">Đến ngày</label>
+                        <input type="date" class="filter-select" id="adminTo">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="adminStatus">Trạng thái</label>
+                        <select class="filter-select" id="adminStatus">
+                            <option value="">Tất cả</option>
+                            <option value="OPEN">Đang mở</option>
+                            <option value="ASSIGNED">Đã gán</option>
+                            <option value="TAKEN">Đã nhận</option>
+                            <option value="FORCE_ASSIGNED">Đã gán (hệ thống)</option>
+                            <option value="UNFILLED">Bỏ trống</option>
+                            <option value="COMPLETED">Đã hoàn thành</option>
+                        </select>
+                    </div>
+                    <p class="form-help admin-filter__hint">Mặc định hiển thị từ 7 ngày trước đến 60 ngày tới.</p>
+                </div>
+                <div class="shifts-grid" id="allShiftsGrid" aria-live="polite">
+                    <div class="empty-state empty-state--wide">
+                        <div class="empty-state__icon" aria-hidden="true">⏳</div>
+                        <div class="empty-state__text">Đang tải…</div>
+                    </div>
+                </div>
+                <div class="pager" id="adminPager"></div>
+            </div>
+
+            <div id="candidatesPanel"></div>
+        </div>
+
+        <!-- ---- Tab: Nhân viên ---- -->
+        <div id="adminPanel-employees" role="tabpanel" aria-labelledby="tab-employees" hidden>
+            <div class="admin-toolbar">
+                <h2 class="admin-form__title">Nhân viên</h2>
+                <button type="button" class="btn btn--primary btn--sm" id="btnAddEmployee">➕ Thêm nhân viên</button>
+            </div>
+            <div class="table-wrap" id="employeesTable"></div>
+        </div>
+
+        <!-- ---- Tab: Danh mục ---- -->
+        <div id="adminPanel-catalog" role="tabpanel" aria-labelledby="tab-catalog" hidden>
+            <div class="catalog-grid">
+                <div>
+                    <div class="admin-toolbar">
+                        <h2 class="admin-form__title">Chi nhánh</h2>
+                        <button type="button" class="btn btn--primary btn--sm" id="btnAddBranch">➕ Thêm chi nhánh</button>
+                    </div>
+                    <div id="branchList"></div>
+                </div>
+                <div>
+                    <div class="admin-toolbar">
+                        <h2 class="admin-form__title">Kỹ năng</h2>
+                        <button type="button" class="btn btn--primary btn--sm" id="btnAddSkill">➕ Thêm kỹ năng</button>
+                    </div>
+                    <div id="skillList"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- ═══════════════════ HỘP THOẠI (dùng <dialog>: tự giữ focus, đóng bằng Esc) ═══════════════════ -->
+
+<dialog id="confirmDialog" class="dialog dialog--small" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <form method="dialog" class="dialog__body">
+        <h2 class="dialog__title" id="confirmTitle">Xác nhận</h2>
+        <p id="confirmMessage" class="dialog__message"></p>
+        <div class="dialog__actions">
+            <button type="submit" value="cancel" class="btn btn--outline" id="confirmCancel" autofocus>Hủy</button>
+            <button type="submit" value="ok" class="btn btn--primary" id="confirmOk">Xác nhận</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="editShiftDialog" class="dialog" aria-labelledby="editShiftHeading">
+    <div class="dialog__body">
+        <button type="button" class="dialog__close" data-action="close-edit" aria-label="Đóng">&times;</button>
+        <h2 class="admin-form__title" id="editShiftHeading">Chỉnh sửa ca làm việc</h2>
+        <form id="editShiftForm" class="admin-form">
+            <input type="hidden" id="editShiftId">
+            <input type="hidden" id="editShiftVersion">
+            <div class="admin-form__group">
+                <label class="form-label" for="editShiftTitle">Tiêu đề ca</label>
+                <input type="text" id="editShiftTitle" required maxlength="200" class="form-input">
+            </div>
+            <div class="admin-form__row">
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftStartTime">Thời gian bắt đầu</label>
+                    <input type="datetime-local" id="editShiftStartTime" required class="form-input">
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftEndTime">Thời gian kết thúc</label>
+                    <input type="datetime-local" id="editShiftEndTime" required class="form-input">
+                </div>
+            </div>
+            <div class="admin-form__row">
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftBranch">Chi nhánh</label>
+                    <select id="editShiftBranch" required class="form-input"></select>
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftSkill">Kỹ năng yêu cầu</label>
+                    <select id="editShiftSkill" class="form-input"><option value="">Không yêu cầu</option></select>
+                </div>
+            </div>
+            <div class="admin-form__row">
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftLevel">Level kỹ năng</label>
+                    <input type="number" id="editShiftLevel" min="1" max="5" required class="form-input">
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="editShiftEmployee">Gán trước cho nhân viên</label>
+                    <select id="editShiftEmployee" class="form-input"><option value="">Để trống (trạng thái OPEN)</option></select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn--primary btn--full">Lưu thay đổi</button>
+        </form>
+    </div>
+</dialog>
+
+<dialog id="employeeDialog" class="dialog" aria-labelledby="employeeHeading">
+    <div class="dialog__body">
+        <button type="button" class="dialog__close" data-action="close-dialog" aria-label="Đóng">&times;</button>
+        <h2 class="admin-form__title" id="employeeHeading">Nhân viên</h2>
+        <form id="employeeForm" class="admin-form">
+            <div class="admin-form__group">
+                <label class="form-label" for="employeeName">Họ tên</label>
+                <input type="text" id="employeeName" class="form-input" required maxlength="150">
+            </div>
+            <div class="admin-form__row" id="employeeCreateOnly">
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeeEmail">Email đăng nhập</label>
+                    <input type="email" id="employeeEmail" class="form-input" maxlength="200" autocomplete="off">
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeePassword">Mật khẩu ban đầu</label>
+                    <input type="password" id="employeePassword" class="form-input" maxlength="100" autocomplete="new-password" aria-describedby="employeePwHelp">
+                </div>
+            </div>
+            <p class="form-help" id="employeePwHelp">Mật khẩu ít nhất 8 ký tự, gồm cả chữ và số. Nhân viên nên đổi ngay ở trang Tài Khoản.</p>
+            <div class="admin-form__row">
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeeRole">Vai trò</label>
+                    <select id="employeeRole" class="form-input">
+                        <option value="EMPLOYEE">Nhân viên</option>
+                        <option value="ADMIN">Quản lý</option>
+                    </select>
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeeBranch">Chi nhánh chính</label>
+                    <select id="employeeBranch" class="form-input"></select>
+                </div>
+            </div>
+            <div class="admin-form__row">
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeeMaxHours">Giờ tối đa/tuần</label>
+                    <input type="number" id="employeeMaxHours" class="form-input" min="1" max="168" value="40">
+                </div>
+                <div class="admin-form__group">
+                    <label class="form-label" for="employeePreferred">Khung giờ ưa thích</label>
+                    <select id="employeePreferred" class="form-input">
+                        <option value="ANY">Linh hoạt</option>
+                        <option value="MORNING">Buổi sáng</option>
+                        <option value="AFTERNOON">Buổi chiều</option>
+                        <option value="EVENING">Buổi tối</option>
+                        <option value="NIGHT">Ban đêm</option>
+                    </select>
+                </div>
+            </div>
+            <fieldset class="skill-picker">
+                <legend class="form-label">Kỹ năng và mức độ</legend>
+                <div id="employeeSkills"></div>
+            </fieldset>
+            <label class="checkbox-row" id="employeeActiveRow">
+                <input type="checkbox" id="employeeActive" checked> Tài khoản đang hoạt động (bỏ chọn để vô hiệu hóa đăng nhập và nhận ca)
+            </label>
+            <button type="submit" class="btn btn--primary btn--full">Lưu</button>
+        </form>
+    </div>
+</dialog>
+
+<dialog id="passwordDialog" class="dialog dialog--small" aria-labelledby="passwordHeading">
+    <div class="dialog__body">
+        <button type="button" class="dialog__close" data-action="close-dialog" aria-label="Đóng">&times;</button>
+        <h2 class="admin-form__title" id="passwordHeading">Đặt lại mật khẩu</h2>
+        <p id="passwordFor" class="dialog__message"></p>
+        <form id="resetPasswordForm" class="admin-form">
+            <div class="admin-form__group">
+                <label class="form-label" for="resetPasswordValue">Mật khẩu mới</label>
+                <input type="password" id="resetPasswordValue" class="form-input" minlength="8" maxlength="100" autocomplete="new-password" required>
+            </div>
+            <p class="form-help">Ít nhất 8 ký tự, gồm cả chữ và số.</p>
+            <button type="submit" class="btn btn--primary btn--full">Đặt lại mật khẩu</button>
+        </form>
+    </div>
+</dialog>
+
+<dialog id="branchDialog" class="dialog dialog--small" aria-labelledby="branchHeading">
+    <div class="dialog__body">
+        <button type="button" class="dialog__close" data-action="close-dialog" aria-label="Đóng">&times;</button>
+        <h2 class="admin-form__title" id="branchHeading">Chi nhánh</h2>
+        <form id="branchForm" class="admin-form">
+            <div class="admin-form__group">
+                <label class="form-label" for="branchName">Tên chi nhánh</label>
+                <input type="text" id="branchName" class="form-input" required maxlength="150">
+            </div>
+            <div class="admin-form__group">
+                <label class="form-label" for="branchAddress">Địa chỉ</label>
+                <input type="text" id="branchAddress" class="form-input" maxlength="300">
+            </div>
+            <div class="admin-form__group">
+                <label class="form-label" for="branchCapacity">Sức chứa (số người làm cùng lúc tối đa; để trống = không giới hạn)</label>
+                <input type="number" id="branchCapacity" class="form-input" min="1">
+            </div>
+            <button type="submit" class="btn btn--primary btn--full">Lưu</button>
+        </form>
+    </div>
+</dialog>
+
+<dialog id="skillDialog" class="dialog dialog--small" aria-labelledby="skillHeading">
+    <div class="dialog__body">
+        <button type="button" class="dialog__close" data-action="close-dialog" aria-label="Đóng">&times;</button>
+        <h2 class="admin-form__title" id="skillHeading">Kỹ năng</h2>
+        <form id="skillForm" class="admin-form">
+            <div class="admin-form__group">
+                <label class="form-label" for="skillName">Tên kỹ năng</label>
+                <input type="text" id="skillName" class="form-input" required maxlength="100">
+            </div>
+            <button type="submit" class="btn btn--primary btn--full">Lưu</button>
+        </form>
+    </div>
+</dialog>
+
+<!-- Toast: vùng thông báo cho trình đọc màn hình -->
+<div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+
+<script type="module" src="/js/main.js?v=20261018_01" th:src="@{/js/main.js(v='20261018_01')}"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - FlexiShift AI</title>
+    <link rel="stylesheet" href="/css/login.css?v=20261018_01" th:href="@{/css/login.css(v='20261018_01')}">
+</head>
+<body>
+
+<main class="login-box">
+    <h1 class="login-title">FlexiShift AI</h1>
+    <form id="loginForm" novalidate>
+        <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-input" required placeholder="Nhập email của bạn" autocomplete="username" aria-describedby="errorMsg">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="password">Mật khẩu</label>
+            <input type="password" id="password" name="password" class="form-input" required placeholder="Nhập mật khẩu" autocomplete="current-password" aria-describedby="errorMsg">
+        </div>
+        <button type="submit" id="btnSubmit" class="btn-submit">Đăng Nhập</button>
+        <div id="errorMsg" class="error-msg" role="alert" hidden>Email hoặc mật khẩu không đúng!</div>
+    </form>
+</main>
+
+<script type="module" src="/js/login.js?v=20261018_01" th:src="@{/js/login.js(v='20261018_01')}"></script>
+
+</body>
+</html>
